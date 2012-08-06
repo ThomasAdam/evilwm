@@ -433,12 +433,13 @@ void set_docks_visible(ScreenInfo *s, int is_visible) {
 	LOG_LEAVE();
 }
 
-static int scale_pos(int new_screen_size, int old_screen_size, int cli_pos, int cli_size) {
-	if (old_screen_size != cli_size && new_screen_size != cli_size) {
-		new_screen_size -= cli_size;
-		old_screen_size -= cli_size;
-	}
-	return new_screen_size * cli_pos / old_screen_size;
+static int scale_pos(int new_screen_size, int old_screen_size, int cli_pos, int cli_size, int border) {
+	cli_size += 2 * border;
+	new_screen_size -= cli_size;
+	old_screen_size -= cli_size;
+	if (old_screen_size <= 0 || new_screen_size <= 0)
+		return cli_pos;
+	return new_screen_size * (cli_pos - border) / old_screen_size + border;
 }
 
 static void fix_screen_client(Client *c, const PhysicalScreen *old_phy) {
@@ -450,19 +451,19 @@ static void fix_screen_client(Client *c, const PhysicalScreen *old_phy) {
 	if (c->oldw) {
 		/* horiz maximised: update width, update old x pos */
 		c->width = neww;
-		c->oldx = scale_pos(neww, oldw, c->oldx, c->oldw + c->border);
+		c->oldx = scale_pos(neww, oldw, c->oldx, c->oldw, c->border);
 	} else {
 		/* horiz normal: update x pos */
-		c->nx = scale_pos(neww, oldw, c->nx, c->width + c->border);
+		c->nx = scale_pos(neww, oldw, c->nx, c->width, c->border);
 	}
 
 	if (c->oldh) {
 		/* vert maximised: update height, update old y pos */
 		c->height = newh;
-		c->oldy = scale_pos(newh, oldh, c->oldy, c->oldh + c->border);
+		c->oldy = scale_pos(newh, oldh, c->oldy, c->oldh, c->border);
 	} else {
 		/* vert normal: update y pos */
-		c->ny = scale_pos(newh, oldh, c->ny, c->height + c->border);
+		c->ny = scale_pos(newh, oldh, c->ny, c->height, c->border);
 	}
 
 	client_calc_cog(c);

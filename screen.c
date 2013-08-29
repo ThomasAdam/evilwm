@@ -261,8 +261,8 @@ void maximise_client(Client *c, int action, int hv) {
 				unsigned long props[2];
 				c->oldx = c->nx;
 				c->oldw = c->width;
-				c->nx = 0;
-				c->width = c->phy->width;
+				c->nx = 0 + c->border;
+				c->width = c->phy->width - c->border * 2;
 				props[0] = c->oldx;
 				props[1] = c->oldw;
 				XChangeProperty(dpy, c->window, xa_evilwm_unmaximised_horz,
@@ -286,8 +286,8 @@ void maximise_client(Client *c, int action, int hv) {
 				unsigned long props[2];
 				c->oldy = c->ny;
 				c->oldh = c->height;
-				c->ny = 0;
-				c->height = c->phy->height;
+				c->ny = 0 + c->border ;
+				c->height = c->phy->height - c->border * 2;
 				props[0] = c->oldy;
 				props[1] = c->oldh;
 				XChangeProperty(dpy, c->window, xa_evilwm_unmaximised_vert,

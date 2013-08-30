@@ -301,7 +301,8 @@ void maximise_client(Client *c, int action, int hv) {
 	 * again.
 	 */
 	if ((hv & MAXIMISE_HORZ) && (hv & MAXIMISE_VERT)) {
-		if (action == NET_WM_STATE_TOGGLE) {
+		if (action == NET_WM_STATE_TOGGLE ||
+		    action == NET_WM_STATE_ADD) {
 			XWindowAttributes attr;
 			XGetWindowAttributes(dpy, c->parent, &attr);
 			if (attr.border_width != 0) {
@@ -312,12 +313,17 @@ void maximise_client(Client *c, int action, int hv) {
 				c->height = c->phy->height;
 				XSetWindowBorderWidth(dpy, c->parent, 0);
 			} else {
+
 				XSetWindowBorderWidth(dpy, c->parent, c->old_border);
 				c->border = c->old_border;
 			}
-
+		} else {
+				XSetWindowBorderWidth(dpy, c->parent, c->old_border);
+				c->border = c->old_border;
 		}
+
 	}
+
 	/* xinerama: update the client's centre of gravity
 	 *  NB, the client doesn't change physical screen */
 	client_calc_cog(c);

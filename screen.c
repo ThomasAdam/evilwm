@@ -261,8 +261,8 @@ void maximise_client(Client *c, int action, int hv) {
 				unsigned long props[2];
 				c->oldx = c->nx;
 				c->oldw = c->width;
-				c->nx = 0;
-				c->width = c->phy->width;
+				c->nx = 0 + c->border;
+				c->width = c->phy->width - c->border * 2;
 				props[0] = c->oldx;
 				props[1] = c->oldw;
 				XChangeProperty(dpy, c->window, xa_evilwm_unmaximised_horz,
@@ -286,14 +286,36 @@ void maximise_client(Client *c, int action, int hv) {
 				unsigned long props[2];
 				c->oldy = c->ny;
 				c->oldh = c->height;
-				c->ny = 0;
-				c->height = c->phy->height;
+				c->ny = 0 + c->border;
+				c->height = c->phy->height - c->border * 2;
 				props[0] = c->oldy;
 				props[1] = c->oldh;
 				XChangeProperty(dpy, c->window, xa_evilwm_unmaximised_vert,
 						XA_CARDINAL, 32, PropModeReplace,
 						(unsigned char *)&props, 2);
 			}
+		}
+	}
+	/* If we're toggling fullscreen, where fullscreen is defined as both
+	 * vert/horiz set, then remove window borders, and put them back
+	 * again.
+	 */
+	if ((hv & MAXIMISE_HORZ) && (hv & MAXIMISE_VERT)) {
+		if (action == NET_WM_STATE_TOGGLE) {
+			XWindowAttributes attr;
+			XGetWindowAttributes(dpy, c->parent, &attr);
+			if (attr.border_width != 0) {
+				c->old_border = c->border;
+				c->border = 0;
+				c->nx = c->ny = 0;
+				c->width = c->phy->width;
+				c->height = c->phy->height;
+				XSetWindowBorderWidth(dpy, c->parent, 0);
+			} else {
+				XSetWindowBorderWidth(dpy, c->parent, c->old_border);
+				c->border = c->old_border;
+			}
+
 		}
 	}
 	/* xinerama: update the client's centre of gravity

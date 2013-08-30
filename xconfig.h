@@ -5,14 +5,16 @@
 #ifndef __XCONFIG_H__
 #define __XCONFIG_H__
 
-enum xconfig_result {
+enum xconfig_result
+{
 	XCONFIG_OK = 0,
 	XCONFIG_BAD_OPTION,
 	XCONFIG_MISSING_ARG,
 	XCONFIG_FILE_ERROR
 };
 
-enum xconfig_option_type {
+enum xconfig_option_type
+{
 	XCONFIG_BOOL,
 	XCONFIG_INT,
 	XCONFIG_STRING,
@@ -22,16 +24,17 @@ enum xconfig_option_type {
 	XCONFIG_END
 };
 
-struct xconfig_option {
+struct xconfig_option
+{
 	enum xconfig_option_type type;
 	const char *name;
-	void *dest;
+	void       *dest;
 };
 
 enum xconfig_result xconfig_parse_file(struct xconfig_option *options,
-		const char *filename);
+	const char *filename);
 
 enum xconfig_result xconfig_parse_cli(struct xconfig_option *options,
-		int argc, char **argv, int *argn);
+	int argc, char **argv, int *argn);
 
-#endif  /* __XCONFIG_H__ */
+#endif /* __XCONFIG_H__ */

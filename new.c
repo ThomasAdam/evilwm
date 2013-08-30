@@ -9,20 +9,23 @@
 #include "evilwm.h"
 #include "log.h"
 
-static void init_geometry(Client *c);
-static void reparent(Client *c);
-static void update_window_type_flags(Client *c, unsigned int type);
+static void init_geometry(Client * c);
+static void reparent(Client * c);
+static void update_window_type_flags(Client * c, unsigned int type);
+
 #ifdef XDEBUG
 static const char *map_state_string(int map_state);
 static const char *gravity_string(int gravity);
-static void debug_wm_normal_hints(XSizeHints *size);
+static void debug_wm_normal_hints(XSizeHints * size);
 #else
-# define debug_wm_normal_hints(s)
+#define debug_wm_normal_hints(s)
 #endif
 
-void make_new_client(Window w, ScreenInfo *s) {
-	Client *c;
-	char *name;
+void
+make_new_client(Window w, ScreenInfo * s)
+{
+	Client     *c;
+	char       *name;
 	XClassHint *class;
 	unsigned int window_type;
 
@@ -44,7 +47,8 @@ void make_new_client(Window w, ScreenInfo *s) {
 	 * XFetchName raised BadWindow - the window has been removed before
 	 * we got a chance to grab the server. */
 	if (initialising == None) {
-		LOG_DEBUG("XError occurred for initialising window - aborting...\n");
+		LOG_DEBUG
+			("XError occurred for initialising window - aborting...\n");
 		XUngrabServer(dpy);
 		LOG_LEAVE();
 		return;
@@ -93,14 +97,18 @@ void make_new_client(Window w, ScreenInfo *s) {
 #ifdef DEBUG
 	{
 		struct list *iter;
-		int i = 0;
+		int         i = 0;
+
 		for (iter = clients_tab_order; iter; iter = iter->next)
 			i++;
-		LOG_DEBUG("new window %dx%d+%d+%d, wincount=%d\n", c->width, c->height, client_to_Xcoord(c,x), client_to_Xcoord(c,y), i);
+		LOG_DEBUG("new window %dx%d+%d+%d, wincount=%d\n", c->width,
+			c->height, client_to_Xcoord(c, x), client_to_Xcoord(c,
+				y), i);
 	}
 #endif
 
-	XSelectInput(dpy, c->window, ColormapChangeMask | EnterWindowMask | PropertyChangeMask);
+	XSelectInput(dpy, c->window,
+		ColormapChangeMask | EnterWindowMask | PropertyChangeMask);
 
 	reparent(c);
 
@@ -116,37 +124,54 @@ void make_new_client(Window w, ScreenInfo *s) {
 	class = XAllocClassHint();
 	if (class) {
 		struct list *aiter = applications;
+
 		XGetClassHint(dpy, w, class);
 		while (aiter) {
 			Application *a = aiter->data;
-			if ((!a->res_name || (class->res_name && !strcmp(class->res_name, a->res_name)))
-					&& (!a->res_class || (class->res_class && !strcmp(class->res_class, a->res_class)))) {
+
+			if ((!a->res_name || (class->res_name
+						&& !strcmp(class->res_name,
+							a->res_name)))
+				&& (!a->res_class || (class->res_class
+						&& !strcmp(class->res_class,
+							a->res_class)))) {
 				if (a->geometry_mask & WidthValue)
 					c->width = a->width * c->width_inc;
 				if (a->geometry_mask & HeightValue)
 					c->height = a->height * c->height_inc;
 				/* Warning: these co-ordinates are in screen co-ordinates */
-				int screen_x, screen_y;
+				int         screen_x, screen_y;
+
 				if (!(a->geometry_mask & XValue)) {
-					screen_x = client_to_Xcoord(c,x);
+					screen_x = client_to_Xcoord(c, x);
 				} else {
 					if (a->geometry_mask & XNegative)
-						screen_x = a->x + DisplayWidth(dpy, s->screen) - c->width - c->border;
+						screen_x =
+							a->x +
+							DisplayWidth(dpy,
+							s->screen) - c->width -
+							c->border;
 					else
 						screen_x = a->x + c->border;
 				}
 				if (!(a->geometry_mask & YValue)) {
-					screen_y = client_to_Xcoord(c,y);
+					screen_y = client_to_Xcoord(c, y);
 				} else {
 					if (a->geometry_mask & YNegative)
-						screen_y = a->y + DisplayHeight(dpy, s->screen) - c->height - c->border;
+						screen_y =
+							a->y +
+							DisplayHeight(dpy,
+							s->screen) -
+							c->height - c->border;
 					else
 						screen_y = a->y + c->border;
 				}
 				client_update_screenpos(c, screen_x, screen_y);
 				moveresizeraise(c);
-				if (a->is_dock) c->is_dock = 1;
-				if (a->vdesk != VDESK_NONE) c->vdesk = a->vdesk;
+				if (a->is_dock)
+					c->is_dock = 1;
+				if (a->vdesk != VDESK_NONE)
+					c->vdesk = a->vdesk;
 			}
 			aiter = aiter->next;
 		}
@@ -160,18 +185,16 @@ void make_new_client(Window w, ScreenInfo *s) {
 
 	/* Only map the window frame (and thus the window) if it's supposed
 	 * to be visible on this virtual desktop. */
-	if (should_be_mapped(c))
-	{
+	if (should_be_mapped(c)) {
 		client_show(c);
 		client_raise(c);
 		select_client(c);
 #ifdef WARP_POINTER
 		setmouse(c->window, c->width + c->border - 1,
-				c->height + c->border - 1);
+			c->height + c->border - 1);
 #endif
 		discard_enter_events(c);
-	}
-	else {
+	} else {
 		set_wm_state(c, IconicState);
 	}
 	ewmh_set_net_wm_desktop(c);
@@ -180,20 +203,22 @@ void make_new_client(Window w, ScreenInfo *s) {
 
 /* Calls XGetWindowAttributes, XGetWMHints and XGetWMNormalHints to determine
  * window's initial geometry. */
-static void init_geometry(Client *c) {
-	int need_send_config = 0;
-	long size_flags;
+static void
+init_geometry(Client * c)
+{
+	int         need_send_config = 0;
+	long        size_flags;
 	XWindowAttributes attr;
 	unsigned long *eprop;
 	unsigned long nitems;
 	PropMwmHints *mprop;
 	unsigned long *lprop;
 
-	if ( (mprop = get_property(c->window, mwm_hints, mwm_hints, &nitems)) ) {
+	if ((mprop = get_property(c->window, mwm_hints, mwm_hints, &nitems))) {
 		if (nitems >= PROP_MWM_HINTS_ELEMENTS
-				&& (mprop->flags & MWM_HINTS_DECORATIONS)
-				&& !(mprop->decorations & MWM_DECOR_ALL)
-				&& !(mprop->decorations & MWM_DECOR_BORDER)) {
+			&& (mprop->flags & MWM_HINTS_DECORATIONS)
+			&& !(mprop->decorations & MWM_DECOR_ALL)
+			&& !(mprop->decorations & MWM_DECOR_BORDER)) {
 			c->border = 0;
 		}
 		XFree(mprop);
@@ -204,20 +229,24 @@ static void init_geometry(Client *c) {
 	/* Get current window attributes */
 	LOG_XENTER("XGetWindowAttributes(window=%lx)", c->window);
 	XGetWindowAttributes(dpy, c->window, &attr);
-	LOG_XDEBUG("(%s) %dx%d+%d+%d, bw = %d\n", map_state_string(attr.map_state), attr.width, attr.height, attr.x, attr.y, attr.border_width);
+	LOG_XDEBUG("(%s) %dx%d+%d+%d, bw = %d\n",
+		map_state_string(attr.map_state), attr.width, attr.height,
+		attr.x, attr.y, attr.border_width);
 	LOG_XLEAVE();
 	c->old_border = attr.border_width;
 	c->oldw = c->oldh = 0;
 	c->cmap = attr.colormap;
 
-	if ( (eprop = get_property(c->window, xa_evilwm_unmaximised_horz, XA_CARDINAL, &nitems)) ) {
+	if ((eprop = get_property(c->window, xa_evilwm_unmaximised_horz,
+				XA_CARDINAL, &nitems))) {
 		if (nitems == 2) {
 			c->oldx = eprop[0];
 			c->oldw = eprop[1];
 		}
 		XFree(eprop);
 	}
-	if ( (eprop = get_property(c->window, xa_evilwm_unmaximised_vert, XA_CARDINAL, &nitems)) ) {
+	if ((eprop = get_property(c->window, xa_evilwm_unmaximised_vert,
+				XA_CARDINAL, &nitems))) {
 		if (nitems == 2) {
 			c->oldy = eprop[0];
 			c->oldh = eprop[1];
@@ -228,7 +257,7 @@ static void init_geometry(Client *c) {
 	size_flags = get_wm_normal_hints(c);
 
 	if ((attr.width >= c->min_width) && (attr.height >= c->min_height)) {
-	/* if (attr.map_state == IsViewable || (size_flags & (PSize | USSize))) { */
+		/* if (attr.map_state == IsViewable || (size_flags & (PSize | USSize))) { */
 		c->width = attr.width;
 		c->height = attr.height;
 	} else {
@@ -240,22 +269,26 @@ static void init_geometry(Client *c) {
 
 	/* Calculate client position (and physical screen) */
 	if ((attr.map_state == IsViewable)
-			|| (size_flags & (/*PPosition |*/ USPosition))) {
+		|| (size_flags & ( /*PPosition | */ USPosition))) {
 		client_update_screenpos(c, attr.x, attr.y);
 	} else {
-		int x, y;
+		int         x, y;
+
 		get_mouse_position(&x, &y, c->screen->root);
 		/* The client will belong to the physical screen the mouse
 		 * is currently on. */
 		c->phy = find_physical_screen(c->screen, x, y);
 		x -= c->phy->xoff;
 		y -= c->phy->yoff;
-		c->nx = (x * (c->phy->width - c->border - c->width)) / c->phy->width;
-		c->ny = (y * (c->phy->height - c->border - c->height)) / c->phy->height;
+		c->nx = (x * (c->phy->width - c->border -
+				c->width)) / c->phy->width;
+		c->ny = (y * (c->phy->height - c->border -
+				c->height)) / c->phy->height;
 		need_send_config = 1;
 	}
 
-	LOG_DEBUG("window started as %dx%d +%d+%d\n", c->width, c->height, client_to_Xcoord(c,x), client_to_Xcoord(c,y));
+	LOG_DEBUG("window started as %dx%d +%d+%d\n", c->width, c->height,
+		client_to_Xcoord(c, x), client_to_Xcoord(c, y));
 	if (attr.map_state == IsViewable) {
 		/* The reparent that is to come would trigger an unmap event */
 		c->ignore_unmap++;
@@ -266,7 +299,8 @@ static void init_geometry(Client *c) {
 	gravitate_border(c, c->border);
 
 	c->vdesk = c->phy->vdesk;
-	if ( (lprop = get_property(c->window, xa_net_wm_desktop, XA_CARDINAL, &nitems)) ) {
+	if ((lprop = get_property(c->window, xa_net_wm_desktop, XA_CARDINAL,
+				&nitems))) {
 		/* NB, Xlib not only returns a 32bit value in a long (which may
 		 * not be 32bits), it also sign extends the 32bit value */
 		if (nitems && valid_vdesk(lprop[0] & UINT32_MAX)) {
@@ -277,7 +311,8 @@ static void init_geometry(Client *c) {
 	/* When restarting the window manager, there may be a mismatch between
 	 * the mapped virtual desktops of the old WM and those of the new. */
 	if (attr.map_state == IsViewable && c->vdesk != c->phy->vdesk) {
-		for (unsigned i = 0; i < (unsigned) c->screen->num_physical; i++) {
+		for (unsigned i = 0; i < (unsigned) c->screen->num_physical;
+			i++) {
 			if (c->vdesk != c->screen->physical[i].vdesk)
 				continue;
 			/* Update client to be on the correct phy */
@@ -287,8 +322,9 @@ static void init_geometry(Client *c) {
 	}
 
 	/* ensure that the client isn't created off screen */
-	int old_nx = c->nx;
-	int old_ny = c->ny;
+	int         old_nx = c->nx;
+	int         old_ny = c->ny;
+
 	position_policy(c);
 	if (old_nx != c->nx || old_ny != c->ny)
 		need_send_config = 1;
@@ -297,15 +333,17 @@ static void init_geometry(Client *c) {
 		send_config(c);
 }
 
-static void reparent(Client *c) {
+static void
+reparent(Client * c)
+{
 	XSetWindowAttributes p_attr;
 
 	p_attr.border_pixel = c->screen->bg.pixel;
 	p_attr.override_redirect = True;
 	p_attr.event_mask = ChildMask | ButtonPressMask | EnterWindowMask;
 	c->parent = XCreateWindow(dpy, c->screen->root,
-		client_to_Xcoord(c,x) - c->border, client_to_Xcoord(c,y) - c->border,
-		c->width, c->height, c->border,
+		client_to_Xcoord(c, x) - c->border, client_to_Xcoord(c,
+			y) - c->border, c->width, c->height, c->border,
 		DefaultDepth(dpy, c->screen->screen), CopyFromParent,
 		DefaultVisual(dpy, c->screen->screen),
 		CWOverrideRedirect | CWBorderPixel | CWEventMask, &p_attr);
@@ -319,10 +357,13 @@ static void reparent(Client *c) {
 }
 
 /* Get WM_NORMAL_HINTS property */
-long get_wm_normal_hints(Client *c) {
+long
+get_wm_normal_hints(Client * c)
+{
 	XSizeHints *size;
-	long flags;
-	long dummy;
+	long        flags;
+	long        dummy;
+
 	size = XAllocSizeHints();
 
 	LOG_XENTER("XGetWMNormalHints(window=%lx)", c->window);
@@ -368,30 +409,39 @@ long get_wm_normal_hints(Client *c) {
 	return flags;
 }
 
-static void update_window_type_flags(Client *c, unsigned int type) {
+static void
+update_window_type_flags(Client * c, unsigned int type)
+{
 	c->is_dock = (type & EWMH_WINDOW_TYPE_DOCK) ? 1 : 0;
 }
 
 /* Determine window type and update flags accordingly */
-void get_window_type(Client *c) {
+void
+get_window_type(Client * c)
+{
 	unsigned int type = ewmh_get_net_wm_window_type(c->window);
+
 	update_window_type_flags(c, type);
 }
 
 #ifdef XDEBUG
-static const char *map_state_string(int map_state) {
+static const char *
+map_state_string(int map_state)
+{
 	const char *map_states[4] = {
 		"IsUnmapped",
 		"IsUnviewable",
 		"IsViewable",
 		"Unknown"
 	};
-	return ((unsigned int)map_state < 3)
+	return ((unsigned int) map_state < 3)
 		? map_states[map_state]
 		: map_states[3];
 }
 
-static const char *gravity_string(int gravity) {
+static const char *
+gravity_string(int gravity)
+{
 	const char *gravities[12] = {
 		"ForgetGravity",
 		"NorthWestGravity",
@@ -406,10 +456,13 @@ static const char *gravity_string(int gravity) {
 		"StaticGravity",
 		"Unknown"
 	};
-	return ((unsigned int)gravity < 11) ? gravities[gravity] : gravities[11];
+	return ((unsigned int) gravity <
+		11) ? gravities[gravity] : gravities[11];
 }
 
-static void debug_wm_normal_hints(XSizeHints *size) {
+static void
+debug_wm_normal_hints(XSizeHints * size)
+{
 	if (size->flags & 15) {
 		LOG_XDEBUG("");
 		if (size->flags & USPosition) {
@@ -427,26 +480,29 @@ static void debug_wm_normal_hints(XSizeHints *size) {
 		LOG_XDEBUG_("\n");
 	}
 	if (size->flags & PMinSize) {
-		LOG_XDEBUG("PMinSize: min_width = %d, min_height = %d\n", size->min_width, size->min_height);
+		LOG_XDEBUG("PMinSize: min_width = %d, min_height = %d\n",
+			size->min_width, size->min_height);
 	}
 	if (size->flags & PMaxSize) {
-		LOG_XDEBUG("PMaxSize: max_width = %d, max_height = %d\n", size->max_width, size->max_height);
+		LOG_XDEBUG("PMaxSize: max_width = %d, max_height = %d\n",
+			size->max_width, size->max_height);
 	}
 	if (size->flags & PResizeInc) {
 		LOG_XDEBUG("PResizeInc: width_inc = %d, height_inc = %d\n",
-				size->width_inc, size->height_inc);
+			size->width_inc, size->height_inc);
 	}
 	if (size->flags & PAspect) {
 		LOG_XDEBUG("PAspect: min_aspect = %d/%d, max_aspect = %d/%d\n",
-				size->min_aspect.x, size->min_aspect.y,
-				size->max_aspect.x, size->max_aspect.y);
+			size->min_aspect.x, size->min_aspect.y,
+			size->max_aspect.x, size->max_aspect.y);
 	}
 	if (size->flags & PBaseSize) {
 		LOG_XDEBUG("PBaseSize: base_width = %d, base_height = %d\n",
-				size->base_width, size->base_height);
+			size->base_width, size->base_height);
 	}
 	if (size->flags & PWinGravity) {
-		LOG_XDEBUG("PWinGravity: %s\n", gravity_string(size->win_gravity));
+		LOG_XDEBUG("PWinGravity: %s\n",
+			gravity_string(size->win_gravity));
 	}
 }
 #endif

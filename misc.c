@@ -12,42 +12,52 @@
 #include "evilwm.h"
 #include "log.h"
 
-int need_client_tidy = 0;
-int ignore_xerror = 0;
+int         need_client_tidy = 0;
+int         ignore_xerror = 0;
 
 /* Now do this by fork()ing twice so we don't have to worry about SIGCHLDs */
-void spawn(const char *const cmd[]) {
+void
+spawn(const char *const cmd[])
+{
 	ScreenInfo *current_screen = find_current_screen();
-	pid_t pid;
+	pid_t       pid;
 
 	if (current_screen && current_screen->display)
 		putenv(current_screen->display);
 	if (!(pid = fork())) {
 		setsid();
 		switch (fork()) {
-			/* execvp()'s prototype is (char *const *) suggesting that it
-			 * modifies the contents of the strings.  The prototype is this
-			 * way due to SUS maintaining compatability with older code.
-			 * However, execvp guarantees not to modify argv, so the following
-			 * cast is valid. */
-			case 0: execvp(cmd[0], (char *const *)cmd);
-			default: _exit(0);
+				/* execvp()'s prototype is (char *const *) suggesting that it
+				 * modifies the contents of the strings.  The prototype is this
+				 * way due to SUS maintaining compatability with older code.
+				 * However, execvp guarantees not to modify argv, so the following
+				 * cast is valid. */
+			case 0:
+				execvp(cmd[0], (char *const *) cmd);
+			default:
+				_exit(0);
 		}
 	}
 	if (pid > 0)
 		wait(NULL);
 }
 
-void handle_signal(int signo) {
-	(void)signo;  /* unused */
+void
+handle_signal(int signo)
+{
+	(void) signo;		/* unused */
 	wm_exit = 1;
 }
 
-int handle_xerror(Display *dsply, XErrorEvent *e) {
-	Client *c;
-	(void)dsply;  /* unused */
+int
+handle_xerror(Display * dsply, XErrorEvent * e)
+{
+	Client     *c;
 
-	LOG_ENTER("handle_xerror(error=%d, request=%d/%d, resourceid=%lx)", e->error_code, e->request_code, e->minor_code, e->resourceid);
+	(void) dsply;		/* unused */
+
+	LOG_ENTER("handle_xerror(error=%d, request=%d/%d, resourceid=%lx)",
+		e->error_code, e->request_code, e->minor_code, e->resourceid);
 
 	if (ignore_xerror) {
 		LOG_DEBUG("ignoring...\n");
@@ -57,13 +67,16 @@ int handle_xerror(Display *dsply, XErrorEvent *e) {
 	/* If this error actually occurred while setting up the new
 	 * window, best let make_new_client() know not to bother */
 	if (initialising != None && e->resourceid == initialising) {
-		LOG_DEBUG("error caught while initialising window=%lx\n", initialising);
+		LOG_DEBUG("error caught while initialising window=%lx\n",
+			initialising);
 		initialising = None;
 		LOG_LEAVE();
 		return 0;
 	}
-	if (e->error_code == BadAccess && e->request_code == X_ChangeWindowAttributes) {
-		LOG_ERROR("root window unavailable (maybe another wm is running?)\n");
+	if (e->error_code == BadAccess
+		&& e->request_code == X_ChangeWindowAttributes) {
+		LOG_ERROR
+			("root window unavailable (maybe another wm is running?)\n");
 		exit(1);
 	}
 
@@ -87,9 +100,12 @@ int handle_xerror(Display *dsply, XErrorEvent *e) {
 
 /* Remove all enter events from the queue except the last of any corresponding
  * to "except"s parent. */
-void discard_enter_events(Client *except) {
-	XEvent tmp, putback_ev;
-	int putback = 0;
+void
+discard_enter_events(Client * except)
+{
+	XEvent      tmp, putback_ev;
+	int         putback = 0;
+
 	XSync(dpy, False);
 	while (XCheckMaskEvent(dpy, EnterWindowMask, &tmp)) {
 		if (tmp.xcrossing.window == except->parent) {

@@ -308,6 +308,9 @@ moveresizeraise(Client * c)
 void
 maximise_client(Client * c, int action, int hv)
 {
+	if (hv & MAXIMISE_FULLSCREEN)
+		hv |= MAXIMISE_HORZ|MAXIMISE_VERT;
+
 	if (hv & MAXIMISE_HORZ) {
 		if (c->oldw) {
 			if (action == NET_WM_STATE_REMOVE
@@ -368,7 +371,7 @@ maximise_client(Client * c, int action, int hv)
 	 * vert/horiz set, then remove window borders, and put them back
 	 * again.
 	 */
-	if ((hv & MAXIMISE_HORZ) && (hv & MAXIMISE_VERT)) {
+	if (hv & MAXIMISE_FULLSCREEN) {
 		if (action == NET_WM_STATE_TOGGLE ||
 			action == NET_WM_STATE_ADD) {
 			XWindowAttributes attr;
@@ -696,7 +699,7 @@ grab_keys_for_screen(ScreenInfo * s)
 		KEY_TOPLEFT, KEY_TOPRIGHT, KEY_BOTTOMLEFT, KEY_BOTTOMRIGHT,
 		KEY_LEFT, KEY_RIGHT, KEY_DOWN, KEY_UP,
 		KEY_LOWER, KEY_ALTLOWER, KEY_INFO, KEY_MAXVERT, KEY_MAX,
-		KEY_DOCK_TOGGLE
+		KEY_FULLSCREEN, KEY_DOCK_TOGGLE
 	};
 #define NUM_GRABS (int)(sizeof(keys_to_grab) / sizeof(KeySym))
 

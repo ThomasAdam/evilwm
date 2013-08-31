@@ -188,6 +188,10 @@ handle_key_event(XKeyEvent * e)
 			maximise_client(c, NET_WM_STATE_TOGGLE,
 				MAXIMISE_HORZ | MAXIMISE_VERT);
 			break;
+		case KEY_FULLSCREEN:
+			maximise_client(c, NET_WM_STATE_TOGGLE,
+				MAXIMISE_FULLSCREEN);
+			break;
 		case KEY_MAXVERT:
 			if (e->state & altmask) {
 				maximise_client(c, NET_WM_STATE_TOGGLE,
@@ -634,7 +638,7 @@ handle_client_message(XClientMessageEvent * e)
 				maximise_hv |= MAXIMISE_HORZ;
 			} else if ((Atom) e->data.l[i] ==
 				xa_net_wm_state_fullscreen) {
-				maximise_hv |= MAXIMISE_VERT | MAXIMISE_HORZ;
+				maximise_hv |= MAXIMISE_FULLSCREEN;
 			}
 		}
 		if (maximise_hv) {

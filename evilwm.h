@@ -84,8 +84,9 @@ typedef struct
 #define EWMH_WINDOW_TYPE_DESKTOP (1<<0)
 #define EWMH_WINDOW_TYPE_DOCK    (1<<1)
 
-#define MAXIMISE_HORZ   (1<<0)
-#define MAXIMISE_VERT   (1<<1)
+#define MAXIMISE_HORZ		(1<<0)
+#define MAXIMISE_VERT		(1<<1)
+#define MAXIMISE_FULLSCREEN	(1<<2)
 
 /* some coding shorthand */
 

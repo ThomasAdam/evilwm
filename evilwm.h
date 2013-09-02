@@ -125,8 +125,7 @@ typedef struct
 
 /* The Xinerama extension informs us of the Physical Screens that
  * make up a Logical Screen (thing with a root window) */
-typedef struct PhysicalScreen PhysicalScreen;
-struct PhysicalScreen
+struct physical_screen
 {
 	int         xoff;	/* x pos of the physical screen in logical screen coordinates */
 	int         yoff;	/* y pos of the physical screen in logical screen coordinates */
@@ -135,8 +134,7 @@ struct PhysicalScreen
 	unsigned int vdesk;	/* virtual desktop displayed on this physical screen */
 };
 
-typedef struct ScreenInfo ScreenInfo;
-struct ScreenInfo
+struct screen_info
 {
 	int         screen;
 	Window      root;
@@ -149,18 +147,16 @@ struct ScreenInfo
 	unsigned int old_vdesk;	/* most recently unmapped vdesk, so user may toggle back to it */
 
 	int         num_physical;	/* Number of entries in @physical@ */
-	PhysicalScreen *physical;	/* Physical screens that make up this screen */
+	struct physical_screen *physical;	/* Physical screens that make up this screen */
 };
 
 /* client structure */
-
-typedef struct Client Client;
-struct Client
+struct client
 {
 	Window      window;
 	Window      parent;
-	ScreenInfo *screen;
-	PhysicalScreen *phy;	/* the physical screen the client is on. */
+	struct screen_info *screen;
+	struct physical_screen *phy;	/* the physical screen the client is on. */
 	Colormap    cmap;
 	int         ignore_unmap;
 
@@ -182,8 +178,7 @@ struct Client
 	int         remove;	/* set when client needs to be removed */
 };
 
-typedef struct Application Application;
-struct Application
+struct application
 {
 	char       *res_name;
 	char       *res_class;
@@ -202,7 +197,7 @@ extern XFontStruct *font;
 extern Cursor move_curs;
 extern Cursor resize_curs;
 extern int  num_screens;
-extern ScreenInfo *screens;
+extern struct screen_info *screens;
 
 #ifdef SHAPE
 extern int  have_shape, shape_event;
@@ -269,11 +264,11 @@ extern int  no_solid_drag;
 extern struct list *applications;
 extern unsigned int opt_vdesks;	/* number of virtual desktops to use */
 
-/* Client tracking information */
+/* struct client tracking information */
 extern struct list *clients_tab_order;
 extern struct list *clients_mapping_order;
 extern struct list *clients_stacking_order;
-extern Client *current;
+extern struct client *current;
 extern volatile Window initialising;
 
 /* Event loop will run until this flag is set */
@@ -282,24 +277,24 @@ extern int  wm_exit;
 /* client.c */
 #define client_to_Xcoord(c,T) (c->phy-> T ## off + c-> n ## T)
 #define client_from_Xcoord(c,T,value) do { c-> n ## T = value - c->phy-> T ## off; } while (0)
-Client     *find_client(Window w);
-void        client_hide(Client * c);
-void        client_show(Client * c);
-void        client_raise(Client * c);
-void        client_lower(Client * c);
-void        client_update_screenpos(Client * c, int screen_x, int screen_y);
-void        gravitate_border(Client * c, int bw);
-void        select_client(Client * c);
-void        client_to_vdesk(Client * c, unsigned int vdesk);
-void        remove_client(Client * c);
-void        send_config(Client * c);
-void        send_wm_delete(Client * c, int kill_client);
-void        set_wm_state(Client * c, int state);
-void        set_shape(Client * c);
+struct client     *find_client(Window w);
+void        client_hide(struct client * c);
+void        client_show(struct client * c);
+void        client_raise(struct client * c);
+void        client_lower(struct client * c);
+void        client_update_screenpos(struct client * c, int screen_x, int screen_y);
+void        gravitate_border(struct client * c, int bw);
+void        select_client(struct client * c);
+void        client_to_vdesk(struct client * c, unsigned int vdesk);
+void        remove_client(struct client * c);
+void        send_config(struct client * c);
+void        send_wm_delete(struct client * c, int kill_client);
+void        set_wm_state(struct client * c, int state);
+void        set_shape(struct client * c);
 void       *get_property(Window w, Atom property, Atom req_type,
 	unsigned long *nitems_return);
-void        client_calc_cog(Client * c);
-void        client_calc_phy(Client * c);
+void        client_calc_cog(struct client * c);
+void        client_calc_phy(struct client * c);
 
 /* events.c */
 
@@ -312,52 +307,52 @@ extern int  ignore_xerror;
 int         handle_xerror(Display * dsply, XErrorEvent * e);
 void        spawn(const char *const cmd[]);
 void        handle_signal(int signo);
-void        discard_enter_events(Client * except);
+void        discard_enter_events(struct client * except);
 
 /* new.c */
 
-void        make_new_client(Window w, ScreenInfo * s);
-long        get_wm_normal_hints(Client * c);
-void        get_window_type(Client * c);
+void        make_new_client(Window w, struct screen_info * s);
+long        get_wm_normal_hints(struct client * c);
+void        get_window_type(struct client * c);
 
 /* screen.c */
 
-void        drag(Client * c);
-void        position_policy(Client * c);
-void        moveresizeraise(Client * c);
-void        moveresize(Client * c);
-void        maximise_client(Client * c, int action, int hv);
-void        show_info(Client * c, unsigned int keycode);
-void        sweep(Client * c);
+void        drag(struct client * c);
+void        position_policy(struct client * c);
+void        moveresizeraise(struct client * c);
+void        moveresize(struct client * c);
+void        maximise_client(struct client * c, int action, int hv);
+void        show_info(struct client * c, unsigned int keycode);
+void        sweep(struct client * c);
 void        next(void);
-bool        switch_vdesk(ScreenInfo * s, PhysicalScreen * p, unsigned int v);
-void        exchange_phy(ScreenInfo * s);
-void        set_docks_visible(ScreenInfo * s, int is_visible);
-ScreenInfo *find_screen(Window root);
-ScreenInfo *find_current_screen(void);
-void        find_current_screen_and_phy(ScreenInfo ** current_screen,
-	PhysicalScreen ** current_phy);
-PhysicalScreen *find_physical_screen(ScreenInfo * screen, int x, int y);
-void        grab_keys_for_screen(ScreenInfo * s);
-void        probe_screen(ScreenInfo * s);
+bool        switch_vdesk(struct screen_info * s, struct physical_screen * p, unsigned int v);
+void        exchange_phy(struct screen_info * s);
+void        set_docks_visible(struct screen_info * s, int is_visible);
+struct screen_info *find_screen(Window root);
+struct screen_info *find_current_screen(void);
+void        find_current_screen_and_phy(struct screen_info ** current_screen,
+	struct physical_screen ** current_phy);
+struct physical_screen *find_physical_screen(struct screen_info * screen, int x, int y);
+void        grab_keys_for_screen(struct screen_info * s);
+void        probe_screen(struct screen_info * s);
 
 /* ewmh.c */
 
 void        ewmh_init(void);
-void        ewmh_init_screen(ScreenInfo * s);
-void        ewmh_deinit_screen(ScreenInfo * s);
-void        ewmh_set_screen_workarea(ScreenInfo * s);
-void        ewmh_init_client(Client * c);
-void        ewmh_deinit_client(Client * c);
-void        ewmh_withdraw_client(Client * c);
-void        ewmh_select_client(Client * c);
-void        ewmh_set_net_client_list(ScreenInfo * s);
-void        ewmh_set_net_client_list_stacking(ScreenInfo * s);
-void        ewmh_set_net_current_desktop(ScreenInfo * s);
-void        ewmh_set_net_active_window(Client * c);
-void        ewmh_set_net_wm_desktop(Client * c);
+void        ewmh_init_screen(struct screen_info * s);
+void        ewmh_deinit_screen(struct screen_info * s);
+void        ewmh_set_screen_workarea(struct screen_info * s);
+void        ewmh_init_client(struct client * c);
+void        ewmh_deinit_client(struct client * c);
+void        ewmh_withdraw_client(struct client * c);
+void        ewmh_select_client(struct client * c);
+void        ewmh_set_net_client_list(struct screen_info * s);
+void        ewmh_set_net_client_list_stacking(struct screen_info * s);
+void        ewmh_set_net_current_desktop(struct screen_info * s);
+void        ewmh_set_net_active_window(struct client * c);
+void        ewmh_set_net_wm_desktop(struct client * c);
 unsigned int ewmh_get_net_wm_window_type(Window w);
-void        ewmh_set_net_wm_state(Client * c);
+void        ewmh_set_net_wm_state(struct client * c);
 void        ewmh_set_net_frame_extents(Window w);
 
 /* annotations.c */
@@ -366,10 +361,10 @@ struct annotate_ctx;
 extern struct annotate_ctx annotate_info_ctx;
 extern struct annotate_ctx annotate_drag_ctx;
 extern struct annotate_ctx annotate_sweep_ctx;
-void        annotate_create(Client * c, struct annotate_ctx *a);
-void        annotate_preupdate(Client * c, struct annotate_ctx *a);
-void        annotate_update(Client * c, struct annotate_ctx *a);
-void        annotate_remove(Client * c, struct annotate_ctx *a);
+void        annotate_create(struct client * c, struct annotate_ctx *a);
+void        annotate_preupdate(struct client * c, struct annotate_ctx *a);
+void        annotate_update(struct client * c, struct annotate_ctx *a);
+void        annotate_remove(struct client * c, struct annotate_ctx *a);
 void        set_annotate_info_outline(const char *arg);
 void        set_annotate_info_info(const char *arg);
 void        set_annotate_info_cog(const char *arg);
@@ -382,7 +377,7 @@ void        set_annotate_sweep_cog(const char *arg);
 
 /* defines */
 static inline int
-should_be_mapped(Client * c)
+should_be_mapped(struct client * c)
 {
 	if (is_fixed(c))
 		return 1;

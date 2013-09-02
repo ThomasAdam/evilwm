@@ -19,7 +19,7 @@ int         ignore_xerror = 0;
 void
 spawn(const char *const cmd[])
 {
-	ScreenInfo *current_screen = find_current_screen();
+	struct screen_info *current_screen = find_current_screen();
 	pid_t       pid;
 
 	if (current_screen && current_screen->display)
@@ -52,7 +52,7 @@ handle_signal(int signo)
 int
 handle_xerror(Display * dsply, XErrorEvent * e)
 {
-	Client     *c;
+	struct client     *c;
 
 	(void) dsply;		/* unused */
 
@@ -101,7 +101,7 @@ handle_xerror(Display * dsply, XErrorEvent * e)
 /* Remove all enter events from the queue except the last of any corresponding
  * to "except"s parent. */
 void
-discard_enter_events(Client * except)
+discard_enter_events(struct client * except)
 {
 	XEvent      tmp, putback_ev;
 	int         putback = 0;

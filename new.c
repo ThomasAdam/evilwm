@@ -9,9 +9,9 @@
 #include "evilwm.h"
 #include "log.h"
 
-static void init_geometry(Client * c);
-static void reparent(Client * c);
-static void update_window_type_flags(Client * c, unsigned int type);
+static void init_geometry(struct client * c);
+static void reparent(struct client * c);
+static void update_window_type_flags(struct client * c, unsigned int type);
 
 #ifdef XDEBUG
 static const char *map_state_string(int map_state);
@@ -22,9 +22,9 @@ static void debug_wm_normal_hints(XSizeHints * size);
 #endif
 
 void
-make_new_client(Window w, ScreenInfo * s)
+make_new_client(Window w, struct screen_info * s)
 {
-	Client     *c;
+	struct client     *c;
 	char       *name;
 	XClassHint *class;
 	unsigned int window_type;
@@ -67,7 +67,7 @@ make_new_client(Window w, ScreenInfo * s)
 		return;
 	}
 
-	c = malloc(sizeof(Client));
+	c = malloc(sizeof(struct client));
 	/* Don't crash the window manager, just fail the operation. */
 	if (!c) {
 		LOG_ERROR("out of memory in new_client; limping onward\n");
@@ -127,7 +127,7 @@ make_new_client(Window w, ScreenInfo * s)
 
 		XGetClassHint(dpy, w, class);
 		while (aiter) {
-			Application *a = aiter->data;
+			struct application *a = aiter->data;
 
 			if ((!a->res_name || (class->res_name
 						&& !strcmp(class->res_name,
@@ -204,7 +204,7 @@ make_new_client(Window w, ScreenInfo * s)
 /* Calls XGetWindowAttributes, XGetWMHints and XGetWMNormalHints to determine
  * window's initial geometry. */
 static void
-init_geometry(Client * c)
+init_geometry(struct client * c)
 {
 	int         need_send_config = 0;
 	long        size_flags;
@@ -334,7 +334,7 @@ init_geometry(Client * c)
 }
 
 static void
-reparent(Client * c)
+reparent(struct client * c)
 {
 	XSetWindowAttributes p_attr;
 
@@ -358,7 +358,7 @@ reparent(Client * c)
 
 /* Get WM_NORMAL_HINTS property */
 long
-get_wm_normal_hints(Client * c)
+get_wm_normal_hints(struct client * c)
 {
 	XSizeHints *size;
 	long        flags;
@@ -410,14 +410,14 @@ get_wm_normal_hints(Client * c)
 }
 
 static void
-update_window_type_flags(Client * c, unsigned int type)
+update_window_type_flags(struct client * c, unsigned int type)
 {
 	c->is_dock = (type & EWMH_WINDOW_TYPE_DOCK) ? 1 : 0;
 }
 
 /* Determine window type and update flags accordingly */
 void
-get_window_type(Client * c)
+get_window_type(struct client * c)
 {
 	unsigned int type = ewmh_get_net_wm_window_type(c->window);
 

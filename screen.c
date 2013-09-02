@@ -10,10 +10,10 @@
 #include "log.h"
 
 static void grab_keysym(Window w, unsigned int mask, KeySym keysym);
-static void fix_screen_client(Client * c, const PhysicalScreen * old_phy);
+static void fix_screen_client(struct client * c, const struct physical_screen * old_phy);
 
 static void
-recalculate_sweep(Client * c, int x1, int y1, int x2, int y2, unsigned force)
+recalculate_sweep(struct client * c, int x1, int y1, int x2, int y2, unsigned force)
 {
 	if (force || c->oldw == 0) {
 		c->oldw = 0;
@@ -38,7 +38,7 @@ recalculate_sweep(Client * c, int x1, int y1, int x2, int y2, unsigned force)
 }
 
 void
-sweep(Client * c)
+sweep(struct client * c)
 {
 	XEvent      ev;
 	int         old_cx = client_to_Xcoord(c, x);
@@ -105,7 +105,7 @@ predicate_keyrepeatpress(Display * dummy, XEvent * ev, XPointer arg)
 }
 
 void
-show_info(Client * c, unsigned int keycode)
+show_info(struct client * c, unsigned int keycode)
 {
 	XEvent      ev;
 	XKeyboardState keyboard;
@@ -150,11 +150,11 @@ absmin(int a, int b)
 }
 
 static void
-snap_client(Client * c)
+snap_client(struct client * c)
 {
 	int         dx, dy;
 	struct list *iter;
-	Client     *ci;
+	struct client     *ci;
 
 	/* client in screen co-ordinates */
 	int         c_screen_x = client_to_Xcoord(c, x);
@@ -228,7 +228,7 @@ snap_client(Client * c)
 }
 
 void
-drag(Client * c)
+drag(struct client * c)
 {
 	XEvent      ev;
 	int         x1, y1;	/* pointer position at start of grab in screen co-ordinates */
@@ -281,14 +281,14 @@ drag(Client * c)
 
 /* limit the client to a visible position on the current phy */
 void
-position_policy(Client * c)
+position_policy(struct client * c)
 {
 	c->nx = MAX(1 - c->width - c->border, MIN(c->nx, c->phy->width));
 	c->ny = MAX(1 - c->height - c->border, MIN(c->ny, c->phy->height));
 }
 
 void
-moveresize(Client * c)
+moveresize(struct client * c)
 {
 	position_policy(c);
 	XMoveResizeWindow(dpy, c->parent,
@@ -299,14 +299,14 @@ moveresize(Client * c)
 }
 
 void
-moveresizeraise(Client * c)
+moveresizeraise(struct client * c)
 {
 	client_raise(c);
 	moveresize(c);
 }
 
 void
-maximise_client(Client * c, int action, int hv)
+maximise_client(struct client * c, int action, int hv)
 {
 	if (hv & MAXIMISE_FULLSCREEN)
 		hv |= MAXIMISE_HORZ|MAXIMISE_VERT;
@@ -409,7 +409,7 @@ void
 next(void)
 {
 	struct list *newl = list_find(clients_tab_order, current);
-	Client     *newc = current;
+	struct client     *newc = current;
 
 	do {
 		if (newl) {
@@ -447,7 +447,7 @@ next(void)
  *  to @v
  */
 bool
-switch_vdesk(ScreenInfo * s, PhysicalScreen * p, unsigned int v)
+switch_vdesk(struct screen_info * s, struct physical_screen * p, unsigned int v)
 {
 	struct list *iter;
 
@@ -469,7 +469,7 @@ switch_vdesk(ScreenInfo * s, PhysicalScreen * p, unsigned int v)
 		select_client(NULL);
 	}
 	for (iter = clients_tab_order; iter; iter = iter->next) {
-		Client     *c = iter->data;
+		struct client     *c = iter->data;
 
 		if (c->screen != s)
 			continue;
@@ -482,7 +482,7 @@ switch_vdesk(ScreenInfo * s, PhysicalScreen * p, unsigned int v)
 			/* NB, vdesk may not be on the same physical screen as previously,
 			 * so move windows onto the physical screen */
 			if (c->phy != p) {
-				PhysicalScreen *old_phy = c->phy;
+				struct physical_screen *old_phy = c->phy;
 
 				c->phy = p;
 				fix_screen_client(c, old_phy);
@@ -505,7 +505,7 @@ switch_vdesk(ScreenInfo * s, PhysicalScreen * p, unsigned int v)
 }
 
 void
-exchange_phy(ScreenInfo * s)
+exchange_phy(struct screen_info * s)
 {
 	if (s->num_physical != 2) {
 		/* todo: handle multiple phys */
@@ -525,7 +525,7 @@ exchange_phy(ScreenInfo * s)
 }
 
 void
-set_docks_visible(ScreenInfo * s, int is_visible)
+set_docks_visible(struct screen_info * s, int is_visible)
 {
 	struct list *iter;
 
@@ -533,7 +533,7 @@ set_docks_visible(ScreenInfo * s, int is_visible)
 		is_visible);
 	s->docks_visible = is_visible;
 	for (iter = clients_tab_order; iter; iter = iter->next) {
-		Client     *c = iter->data;
+		struct client     *c = iter->data;
 
 		if (c->screen != s)
 			continue;
@@ -564,7 +564,7 @@ scale_pos(int new_screen_size, int old_screen_size, int cli_pos, int cli_size,
 }
 
 static void
-fix_screen_client(Client * c, const PhysicalScreen * old_phy)
+fix_screen_client(struct client * c, const struct physical_screen * old_phy)
 {
 	int         oldw = old_phy->width;
 	int         oldh = old_phy->height;
@@ -593,7 +593,7 @@ fix_screen_client(Client * c, const PhysicalScreen * old_phy)
 	moveresize(c);
 }
 
-ScreenInfo *
+struct screen_info *
 find_screen(Window root)
 {
 	int         i;
@@ -605,18 +605,18 @@ find_screen(Window root)
 	return NULL;
 }
 
-ScreenInfo *
+struct screen_info *
 find_current_screen(void)
 {
-	ScreenInfo *current_screen;
+	struct screen_info *current_screen;
 
 	find_current_screen_and_phy(&current_screen, NULL);
 	return current_screen;
 }
 
 void
-find_current_screen_and_phy(ScreenInfo ** current_screen,
-	PhysicalScreen ** current_phy)
+find_current_screen_and_phy(struct screen_info ** current_screen,
+	struct physical_screen ** current_phy)
 {
 	Window      cur_root, dw;
 	int         di;
@@ -638,10 +638,10 @@ find_current_screen_and_phy(ScreenInfo ** current_screen,
  *   If the point isn't on a physical screen, finds the closest screen
  *   centre.
  */
-PhysicalScreen *
-find_physical_screen(ScreenInfo * screen, int screen_x, int screen_y)
+struct physical_screen *
+find_physical_screen(struct screen_info * screen, int screen_x, int screen_y)
 {
-	PhysicalScreen *phy = NULL;
+	struct physical_screen *phy = NULL;
 
 	/* Find if (screen_x,y) is on any physical screen */
 	for (unsigned i = 0; i < (unsigned) screen->num_physical; i++) {
@@ -657,7 +657,7 @@ find_physical_screen(ScreenInfo * screen, int screen_x, int screen_y)
 	int         val = INT_MAX;
 
 	for (unsigned i = 0; i < (unsigned) screen->num_physical; i++) {
-		PhysicalScreen *p = &screen->physical[i];
+		struct physical_screen *p = &screen->physical[i];
 
 		int         dx = screen_x - p->xoff - p->width / 2;
 		int         dy = screen_y - p->yoff - p->height / 2;
@@ -687,7 +687,7 @@ grab_keysym(Window w, unsigned int mask, KeySym keysym)
 }
 
 void
-grab_keys_for_screen(ScreenInfo * s)
+grab_keys_for_screen(struct screen_info * s)
 {
 	const KeySym keys_to_grab[] = {
 #ifdef VWM
@@ -749,8 +749,8 @@ probe_screen_xinerama(void)
 		return false;
 	}
 
-	PhysicalScreen *new_phys =
-		malloc(num_phy_screens * sizeof(PhysicalScreen));
+	struct physical_screen *new_phys =
+		malloc(num_phy_screens * sizeof(struct physical_screen));
 	for (int j = 0; j < num_phy_screens; j++) {
 		new_phys[j].xoff = xin_scr_info[j].x_org;
 		new_phys[j].yoff = xin_scr_info[j].y_org;
@@ -767,10 +767,10 @@ probe_screen_xinerama(void)
 #endif
 
 static void
-probe_screen_default(ScreenInfo * s)
+probe_screen_default(struct screen_info * s)
 {
 	s->num_physical = 1;
-	s->physical = malloc(sizeof(PhysicalScreen));
+	s->physical = malloc(sizeof(struct physical_screen));
 	s->physical->xoff = 0;
 	s->physical->yoff = 0;
 	s->physical->width = DisplayWidth(dpy, s->screen);
@@ -779,7 +779,7 @@ probe_screen_default(ScreenInfo * s)
 
 #ifdef RANDR
 static bool
-probe_screen_xrandr(ScreenInfo * s)
+probe_screen_xrandr(struct screen_info * s)
 {
 	if (!have_randr)
 		return false;
@@ -801,8 +801,8 @@ probe_screen_xrandr(ScreenInfo * s)
 
 	/* assume a single crtc per physical screen, clean up later */
 	int         num_physical = rr_screenres->ncrtc;
-	PhysicalScreen *new_phys =
-		malloc(num_physical * sizeof(PhysicalScreen));
+	struct physical_screen *new_phys =
+		malloc(num_physical * sizeof(struct physical_screen));
 
 	if (num_physical == 0) {
 		LOG_LEAVE();
@@ -860,7 +860,7 @@ probe_screen_xrandr(ScreenInfo * s)
 #endif
 
 void
-probe_screen(ScreenInfo * s)
+probe_screen(struct screen_info * s)
 {
 #ifdef RANDR
 	if (probe_screen_xrandr(s))

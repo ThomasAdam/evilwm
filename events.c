@@ -29,11 +29,11 @@ static void
 handle_key_event(XKeyEvent * e)
 {
 	KeySym      key = XKeycodeToKeysym(dpy, e->keycode, 0);
-	Client     *c;
+	struct client     *c;
 	int         width_inc, height_inc;
 	bool        move_client;
-	ScreenInfo *current_screen;
-	PhysicalScreen *current_phy;
+	struct screen_info *current_screen;
+	struct physical_screen *current_phy;
 
 	find_current_screen_and_phy(&current_screen, &current_phy);
 
@@ -233,7 +233,7 @@ handle_key_event(XKeyEvent * e)
 static void
 handle_button_event(XButtonEvent * e)
 {
-	Client     *c = find_client(e->window);
+	struct client     *c = find_client(e->window);
 
 	if (c) {
 		switch (e->button) {
@@ -253,7 +253,7 @@ handle_button_event(XButtonEvent * e)
 }
 
 static void
-do_window_changes(int value_mask, XWindowChanges * wc, Client * c, int gravity)
+do_window_changes(int value_mask, XWindowChanges * wc, struct client * c, int gravity)
 {
 	if (gravity == 0)
 		gravity = c->win_gravity_hint;
@@ -351,7 +351,7 @@ do_window_changes(int value_mask, XWindowChanges * wc, Client * c, int gravity)
 static void
 handle_configure_request(XConfigureRequestEvent * e)
 {
-	Client     *c = find_client(e->window);
+	struct client     *c = find_client(e->window);
 	XWindowChanges wc;
 
 	wc.x = e->x;
@@ -363,7 +363,7 @@ handle_configure_request(XConfigureRequestEvent * e)
 	wc.stack_mode = e->detail;
 	if (c) {
 		if (e->value_mask & CWStackMode && e->value_mask & CWSibling) {
-			Client     *sibling = find_client(e->above);
+			struct client     *sibling = find_client(e->above);
 
 			if (sibling) {
 				wc.sibling = sibling->parent;
@@ -384,7 +384,7 @@ handle_configure_request(XConfigureRequestEvent * e)
 static void
 handle_map_request(XMapRequestEvent * e)
 {
-	Client     *c = find_client(e->window);
+	struct client     *c = find_client(e->window);
 
 	LOG_ENTER("handle_map_request(window=%lx)", e->window);
 	if (c) {
@@ -404,7 +404,7 @@ handle_map_request(XMapRequestEvent * e)
 static void
 handle_unmap_event(XUnmapEvent * e)
 {
-	Client     *c = find_client(e->window);
+	struct client     *c = find_client(e->window);
 
 	LOG_ENTER("handle_unmap_event(window=%lx)", e->window);
 	if (c) {
@@ -426,7 +426,7 @@ handle_unmap_event(XUnmapEvent * e)
 static void
 handle_colormap_change(XColormapEvent * e)
 {
-	Client     *c = find_client(e->window);
+	struct client     *c = find_client(e->window);
 
 	if (c && e->new) {
 		c->cmap = e->colormap;
@@ -437,7 +437,7 @@ handle_colormap_change(XColormapEvent * e)
 static void
 handle_property_change(XPropertyEvent * e)
 {
-	Client     *c = find_client(e->window);
+	struct client     *c = find_client(e->window);
 
 	if (c) {
 		LOG_ENTER("handle_property_change(window=%lx, atom=%s)",
@@ -459,7 +459,7 @@ handle_property_change(XPropertyEvent * e)
 static void
 handle_enter_event(XCrossingEvent * e)
 {
-	Client     *c;
+	struct client     *c;
 
 	if ((c = find_client(e->window))) {
 		if (!is_fixed(c) && c->vdesk != c->phy->vdesk)
@@ -486,7 +486,7 @@ handle_mappingnotify_event(XMappingEvent * e)
 static void
 handle_shape_event(XShapeEvent * e)
 {
-	Client     *c = find_client(e->window);
+	struct client     *c = find_client(e->window);
 
 	if (c)
 		set_shape(c);
@@ -498,9 +498,9 @@ static void
 handle_randr_event(XRRScreenChangeNotifyEvent * e)
 {
 	XRRUpdateConfiguration((XEvent *) e);
-	ScreenInfo *s = find_screen(e->root);
+	struct screen_info *s = find_screen(e->root);
 
-	PhysicalScreen *old_phys = s->physical;
+	struct physical_screen *old_phys = s->physical;
 	int         old_num_phys = s->num_physical;
 
 	probe_screen(s);
@@ -548,8 +548,8 @@ handle_randr_event(XRRScreenChangeNotifyEvent * e)
 static void
 handle_client_message(XClientMessageEvent * e)
 {
-	ScreenInfo *s = find_current_screen();
-	Client     *c;
+	struct screen_info *s = find_current_screen();
+	struct client     *c;
 
 	LOG_ENTER("handle_client_message(window=%lx, format=%d, type=%s)",
 		e->window, e->format, debug_atom_name(e->message_type));
@@ -730,7 +730,7 @@ event_main_loop(void)
 
 			need_client_tidy = 0;
 			for (iter = clients_tab_order; iter; iter = niter) {
-				Client     *c = iter->data;
+				struct client     *c = iter->data;
 
 				niter = iter->next;
 				if (c->remove)

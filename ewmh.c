@@ -153,7 +153,7 @@ ewmh_init(void)
 }
 
 void
-ewmh_init_screen(ScreenInfo * s)
+ewmh_init_screen(struct screen_info * s)
 {
 	unsigned long pid = getpid();
 
@@ -222,7 +222,7 @@ ewmh_init_screen(ScreenInfo * s)
 }
 
 void
-ewmh_deinit_screen(ScreenInfo * s)
+ewmh_deinit_screen(struct screen_info * s)
 {
 	XDeleteProperty(dpy, s->root, xa_net_supported);
 	XDeleteProperty(dpy, s->root, xa_net_client_list);
@@ -238,7 +238,7 @@ ewmh_deinit_screen(ScreenInfo * s)
 }
 
 void
-ewmh_set_screen_workarea(ScreenInfo * s)
+ewmh_set_screen_workarea(struct screen_info * s)
 {
 	unsigned long workarea[4] = {
 		0, 0,
@@ -256,7 +256,7 @@ ewmh_set_screen_workarea(ScreenInfo * s)
 }
 
 void
-ewmh_init_client(Client * c)
+ewmh_init_client(struct client * c)
 {
 	Atom        allowed_actions[] = {
 		xa_net_wm_action_move,
@@ -280,33 +280,33 @@ ewmh_init_client(Client * c)
 }
 
 void
-ewmh_deinit_client(Client * c)
+ewmh_deinit_client(struct client * c)
 {
 	XDeleteProperty(dpy, c->window, xa_net_wm_allowed_actions);
 }
 
 void
-ewmh_withdraw_client(Client * c)
+ewmh_withdraw_client(struct client * c)
 {
 	XDeleteProperty(dpy, c->window, xa_net_wm_desktop);
 	XDeleteProperty(dpy, c->window, xa_net_wm_state);
 }
 
 void
-ewmh_select_client(Client * c)
+ewmh_select_client(struct client * c)
 {
 	clients_tab_order = list_to_head(clients_tab_order, c);
 }
 
 void
-ewmh_set_net_client_list(ScreenInfo * s)
+ewmh_set_net_client_list(struct screen_info * s)
 {
 	Window     *windows = alloc_window_array();
 	struct list *iter;
 	int         i = 0;
 
 	for (iter = clients_mapping_order; iter; iter = iter->next) {
-		Client     *c = iter->data;
+		struct client     *c = iter->data;
 
 		if (c->screen == s) {
 			windows[i++] = c->window;
@@ -317,14 +317,14 @@ ewmh_set_net_client_list(ScreenInfo * s)
 }
 
 void
-ewmh_set_net_client_list_stacking(ScreenInfo * s)
+ewmh_set_net_client_list_stacking(struct screen_info * s)
 {
 	Window     *windows = alloc_window_array();
 	struct list *iter;
 	int         i = 0;
 
 	for (iter = clients_stacking_order; iter; iter = iter->next) {
-		Client     *c = iter->data;
+		struct client     *c = iter->data;
 
 		if (c->screen == s) {
 			windows[i++] = c->window;
@@ -335,7 +335,7 @@ ewmh_set_net_client_list_stacking(ScreenInfo * s)
 }
 
 void
-ewmh_set_net_current_desktop(ScreenInfo * s)
+ewmh_set_net_current_desktop(struct screen_info * s)
 {
 	unsigned long vdesk = s->physical->vdesk;
 
@@ -352,7 +352,7 @@ ewmh_set_net_current_desktop(ScreenInfo * s)
 }
 
 void
-ewmh_set_net_active_window(Client * c)
+ewmh_set_net_active_window(struct client * c)
 {
 	int         i;
 
@@ -371,7 +371,7 @@ ewmh_set_net_active_window(Client * c)
 }
 
 void
-ewmh_set_net_wm_desktop(Client * c)
+ewmh_set_net_wm_desktop(struct client * c)
 {
 	unsigned long vdesk = c->vdesk;
 
@@ -399,7 +399,7 @@ ewmh_get_net_wm_window_type(Window w)
 }
 
 void
-ewmh_set_net_wm_state(Client * c)
+ewmh_set_net_wm_state(struct client * c)
 {
 	Atom        state[3];
 	int         i = 0;

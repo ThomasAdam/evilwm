@@ -14,13 +14,13 @@ static int  send_xmessage(Window w, Atom a, long x);
 /* used all over the place.  return the client that has specified window as
  * either window or parent */
 
-Client     *
+struct client     *
 find_client(Window w)
 {
 	struct list *iter;
 
 	for (iter = clients_tab_order; iter; iter = iter->next) {
-		Client     *c = iter->data;
+		struct client     *c = iter->data;
 
 		if (w == c->parent || w == c->window)
 			return c;
@@ -29,7 +29,7 @@ find_client(Window w)
 }
 
 void
-client_hide(Client * c)
+client_hide(struct client * c)
 {
 	c->ignore_unmap++;	/* Ignore unmap so we don't remove client */
 	XUnmapWindow(dpy, c->parent);
@@ -37,14 +37,14 @@ client_hide(Client * c)
 }
 
 void
-client_show(Client * c)
+client_show(struct client * c)
 {
 	XMapWindow(dpy, c->parent);
 	set_wm_state(c, NormalState);
 }
 
 void
-client_raise(Client * c)
+client_raise(struct client * c)
 {
 	XRaiseWindow(dpy, c->parent);
 	clients_stacking_order = list_to_tail(clients_stacking_order, c);
@@ -54,10 +54,10 @@ client_raise(Client * c)
 /* This doesn't just call XLowerWindow(), as that could push the window
  * below "DESKTOP" type windows we're not managing. */
 void
-client_lower(Client * c)
+client_lower(struct client * c)
 {
 	struct list *iter;
-	Client     *below;
+	struct client     *below;
 	Window      order[2];
 
 	/* Find lowest other client in stacking order that is visible on the
@@ -85,7 +85,7 @@ client_lower(Client * c)
  *   Calculate the centre of gravity for a particular client
  */
 void
-client_calc_cog(Client * c)
+client_calc_cog(struct client * c)
 {
 	c->cog.x = c->width / 2;
 	c->cog.y = c->height / 2;
@@ -96,7 +96,7 @@ client_calc_cog(Client * c)
  *   Update the client's notion of which physical screen it belongs.
  */
 void
-client_calc_phy(Client * c)
+client_calc_phy(struct client * c)
 {
 	client_update_screenpos(c, client_to_Xcoord(c, x), client_to_Xcoord(c,
 			y));
@@ -113,7 +113,7 @@ client_calc_phy(Client * c)
  *  NB, this routine must be used when translating from X11 screen co-ordinates
  */
 void
-client_update_screenpos(Client * c, int screen_x, int screen_y)
+client_update_screenpos(struct client * c, int screen_x, int screen_y)
 {
 	c->phy = find_physical_screen(c->screen, screen_x + c->cog.x,
 		screen_y + c->cog.y);
@@ -122,7 +122,7 @@ client_update_screenpos(Client * c, int screen_x, int screen_y)
 }
 
 void
-set_wm_state(Client * c, int state)
+set_wm_state(struct client * c, int state)
 {
 	/* Using "long" for the type of "data" looks wrong, but the
 	 * fine people in the X Consortium defined it this way
@@ -138,7 +138,7 @@ set_wm_state(Client * c, int state)
 
 /* Inform the client of the current window configuration */
 void
-send_config(Client * c)
+send_config(struct client * c)
 {
 	XConfigureEvent ce;
 
@@ -159,7 +159,7 @@ send_config(Client * c)
 
 /* Shift client to show border according to window's gravity. */
 void
-gravitate_border(Client * c, int bw)
+gravitate_border(struct client * c, int bw)
 {
 	int         dx = 0, dy = 0;
 
@@ -206,7 +206,7 @@ gravitate_border(Client * c, int bw)
 }
 
 void
-select_client(Client * c)
+select_client(struct client * c)
 {
 	if (current)
 		XSetWindowBorder(dpy, current->parent,
@@ -231,7 +231,7 @@ select_client(Client * c)
  *   Send a client to a particular vdesk, mapping/unmapping it as required.
  */
 void
-client_to_vdesk(Client * c, unsigned int vdesk)
+client_to_vdesk(struct client * c, unsigned int vdesk)
 {
 	if (valid_vdesk(vdesk)) {
 		c->vdesk = vdesk;
@@ -246,7 +246,7 @@ client_to_vdesk(Client * c, unsigned int vdesk)
 }
 
 void
-remove_client(Client * c)
+remove_client(struct client * c)
 {
 	LOG_ENTER("remove_client(window=%lx, %s)", c->window,
 		c->remove ? "withdrawing" : "wm quitting");
@@ -313,7 +313,7 @@ remove_client(Client * c)
 }
 
 void
-send_wm_delete(Client * c, int kill_client)
+send_wm_delete(struct client * c, int kill_client)
 {
 	int         i, n, found = 0;
 	Atom       *protocols;
@@ -347,7 +347,7 @@ send_xmessage(Window w, Atom a, long x)
 
 #ifdef SHAPE
 void
-set_shape(Client * c)
+set_shape(struct client * c)
 {
 	int         bounding_shaped;
 	int         i, b;

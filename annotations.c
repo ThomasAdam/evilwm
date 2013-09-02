@@ -18,9 +18,9 @@
  */
 
 static Window info_window = None;
-static void infobanner_create(Client * c);
-static void infobanner_update(Client * c);
-static void infobanner_remove(Client * c);
+static void infobanner_create(struct client * c);
+static void infobanner_update(struct client * c);
+static void infobanner_remove(struct client * c);
 
 #ifdef PANGO
 static XftDraw *info_xft_draw = NULL;
@@ -30,7 +30,7 @@ static PangoLayout *info_pl = NULL;
 #endif
 
 static void
-infobanner_create(Client * c)
+infobanner_create(struct client * c)
 {
 	assert(info_window == None);
 	info_window = XCreateWindow(dpy, c->screen->root, -4, -4, 2, 2, 0,
@@ -91,7 +91,7 @@ fetch_utf8_name(Display * d, Window w, char **name)
 }
 
 static void
-infobanner_update(Client * c)
+infobanner_update(struct client * c)
 {
 	char       *name;
 	char        buf[27];
@@ -154,7 +154,7 @@ infobanner_update(Client * c)
 }
 
 static void
-infobanner_remove(Client * c)
+infobanner_remove(struct client * c)
 {
 	(void) c;
 	if (info_window) {
@@ -171,7 +171,7 @@ infobanner_remove(Client * c)
  */
 
 static void
-xor_draw_outline(Client * c)
+xor_draw_outline(struct client * c)
 {
 	int         screen_x = client_to_Xcoord(c, x);
 	int         screen_y = client_to_Xcoord(c, y);
@@ -182,7 +182,7 @@ xor_draw_outline(Client * c)
 }
 
 static void
-xor_draw_info(Client * c)
+xor_draw_info(struct client * c)
 {
 	int         screen_x = client_to_Xcoord(c, x);
 	int         screen_y = client_to_Xcoord(c, y);
@@ -200,7 +200,7 @@ xor_draw_info(Client * c)
 }
 
 static void
-xor_draw_cog(Client * c)
+xor_draw_cog(struct client * c)
 {
 	int         screen_x = client_to_Xcoord(c, x);
 	int         screen_y = client_to_Xcoord(c, y);
@@ -236,11 +236,11 @@ xor_fini(void)
 }
 
 #define xor_template(name) \
-	static void xor_ ## name ## _create(Client *c) { \
+	static void xor_ ## name ## _create(struct client *c) { \
 		xor_init(); \
 		xor_draw_ ## name (c); \
 	} \
-	static void xor_ ## name ## _remove(Client *c) { \
+	static void xor_ ## name ## _remove(struct client *c) { \
 		xor_draw_ ## name (c); \
 		xor_fini(); \
 	}
@@ -259,7 +259,7 @@ static unsigned shape_outline_width;
 static unsigned shape_outline_height;
 
 static void
-shape_outline_shape(Client * c)
+shape_outline_shape(struct client * c)
 {
 	(void) c;
 	unsigned    width = shape_outline_width;
@@ -281,7 +281,7 @@ shape_outline_shape(Client * c)
 }
 
 static void
-shape_outline_create(Client * c)
+shape_outline_create(struct client * c)
 {
 	if (shape_outline_window != None)
 		return;
@@ -307,7 +307,7 @@ shape_outline_create(Client * c)
 }
 
 static void
-shape_outline_remove(Client * c)
+shape_outline_remove(struct client * c)
 {
 	(void) c;
 	if (shape_outline_window != None)
@@ -316,7 +316,7 @@ shape_outline_remove(Client * c)
 }
 
 static void
-shape_outline_update(Client * c)
+shape_outline_update(struct client * c)
 {
 	int         screen_x = client_to_Xcoord(c, x) - c->border;
 	int         screen_y = client_to_Xcoord(c, y) - c->border;
@@ -334,7 +334,7 @@ shape_outline_update(Client * c)
 }
 
 static void
-shape_outline_cog_shape(Client * c)
+shape_outline_cog_shape(struct client * c)
 {
 	Region      r = XCreateRegion();
 
@@ -348,7 +348,7 @@ shape_outline_cog_shape(Client * c)
 
 static unsigned shape_cog_serial = 0;
 static void
-shape_cog_create(Client * c)
+shape_cog_create(struct client * c)
 {
 	shape_outline_create(c);
 	shape_outline_cog_shape(c);
@@ -356,7 +356,7 @@ shape_cog_create(Client * c)
 }
 
 static void
-shape_cog_update(Client * c)
+shape_cog_update(struct client * c)
 {
 	shape_outline_update(c);
 	if (shape_cog_serial != shape_outline_serial) {
@@ -371,10 +371,10 @@ shape_cog_update(Client * c)
  */
 typedef struct
 {
-	void        (*create) (Client * c);
-	void        (*preupdate) (Client * c);
-	void        (*update) (Client * c);
-	void        (*remove) (Client * c);
+	void        (*create) (struct client * c);
+	void        (*preupdate) (struct client * c);
+	void        (*update) (struct client * c);
+	void        (*remove) (struct client * c);
 } annotate_funcs;
 
 const annotate_funcs x11_infobanner = {
@@ -455,7 +455,7 @@ annotate_ctx_t annotate_sweep_ctx =
  * Annotation functions
  */
 #define annotate_template(name) \
-	void annotate_ ## name (Client *c, annotate_ctx_t *a) { \
+	void annotate_ ## name (struct client *c, annotate_ctx_t *a) { \
 		if (!a) return; \
 		if (a->outline && a->outline->name) a->outline->name(c); \
 		if (a->info && a->info->name) a->info->name(c); \

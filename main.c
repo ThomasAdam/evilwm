@@ -21,7 +21,7 @@ XFontStruct *font;
 Cursor      move_curs;
 Cursor      resize_curs;
 int         num_screens;
-ScreenInfo *screens;
+struct screen_info *screens;
 
 #ifdef SHAPE
 int         have_shape, shape_event;
@@ -67,11 +67,11 @@ unsigned int opt_vdesks = 0;
 #endif
 KeySym      opt_key_kill = XK_Escape;
 
-/* Client tracking information */
+/* struct client tracking information */
 struct list *clients_tab_order = NULL;
 struct list *clients_mapping_order = NULL;
 struct list *clients_stacking_order = NULL;
-Client     *current = NULL;
+struct client     *current = NULL;
 volatile Window initialising = None;
 
 /* Event loop will run until this flag is set */
@@ -372,7 +372,7 @@ setup_screens(void)
 
 	attr.event_mask = ChildMask | EnterWindowMask | ColormapChangeMask;
 
-	screens = xmalloc(num_screens * sizeof(ScreenInfo));
+	screens = xmalloc(num_screens * sizeof(struct screen_info));
 	for (int i = 0; i < num_screens; i++) {
 		screens[i].display = screen_to_display_str(i);
 		screens[i].screen = i;
@@ -451,7 +451,7 @@ setup_screens(void)
 static void
 set_app(const char *arg)
 {
-	Application *new = xmalloc(sizeof(Application));
+	struct application *new = xmalloc(sizeof(struct application));
 	char       *tmp;
 
 	new->res_name = new->res_class = NULL;
@@ -476,7 +476,7 @@ static void
 set_app_geometry(const char *arg)
 {
 	if (applications) {
-		Application *app = applications->data;
+		struct application *app = applications->data;
 
 		app->geometry_mask = XParseGeometry(arg,
 			&app->x, &app->y, &app->width, &app->height);
@@ -487,7 +487,7 @@ static void
 set_app_dock(void)
 {
 	if (applications) {
-		Application *app = applications->data;
+		struct application *app = applications->data;
 
 		app->is_dock = 1;
 	}
@@ -499,7 +499,7 @@ set_app_vdesk(const char *arg)
 	unsigned int v = atoi(arg);
 
 	if (applications && valid_vdesk(v)) {
-		Application *app = applications->data;
+		struct application *app = applications->data;
 
 		app->vdesk = v;
 	}
@@ -509,7 +509,7 @@ static void
 set_app_fixed(void)
 {
 	if (applications) {
-		Application *app = applications->data;
+		struct application *app = applications->data;
 
 		app->vdesk = VDESK_FIXED;
 	}

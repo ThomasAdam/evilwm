@@ -19,11 +19,15 @@
 #define KEY_FULLSCREEN	XK_f
 #define KEY_DOCK_TOGGLE	 XK_d
 #define KEY_FIX		XK_p
-#define KEY_PREVDESK	XK_Left
-#define KEY_NEXTDESK	XK_Right
+#define KEY_PREVDESK	XK_c
+#define KEY_NEXTDESK	XK_v
 #define KEY_TOGGLEDESK	XK_a
 #define KEY_EXGPHY	XK_s
 #define KEY_EXPAND	XK_e
+#define KEY_SNAPUP	XK_Up
+#define KEY_SNAPDOWN	XK_Down
+#define KEY_SNAPLEFT	XK_Left
+#define KEY_SNAPRIGHT	XK_Right
 #define KEY_KILL	opt_key_kill
 
 #endif

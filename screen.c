@@ -307,7 +307,7 @@ client_expand(struct client *c)
 			OVERLAP(x, w, regions[i].x, regions[i].w))
 			n = MAX(n, regions[i].y + regions[i].h);
 
-	h += (y - n) - c->border - c->border;
+	h += (y - n) - (c->border * 2);
 	y = n + (c->border * 2);
 
 	/* try to grow downward. locate the upper edge of the nearest
@@ -329,7 +329,7 @@ client_expand(struct client *c)
 			n = MAX(n, regions[i].x + regions[i].w);
 
 	w += (x - n) - (c->border * 2);
-	x = n + c->border + c->border;
+	x = n + (c->border * 2);
 
 	/* try to grow right. locate the left edge of the nearest fully visible
 	 * window
@@ -360,7 +360,132 @@ client_expand(struct client *c)
 }
 
 void
-drag(struct client *c)
+client_move_snap(struct client *c, int direction)
+{
+	struct list	*iter;
+	struct client	*ci;
+	workarea	*regions;
+	int		 i, n, relevant;
+	int		 x, y, w, h;
+
+	relevant = 0;
+	for (iter = clients_tab_order; iter != NULL; iter = iter->next) {
+		ci = iter->data;
+
+		if (client_compares(ci, c))
+			relevant++;
+	}
+
+	// list of coords/sizes for fully visible windows on this desktop
+	regions = malloc(sizeof(workarea) * relevant);
+	if (regions == NULL) {
+		fprintf(stderr, "Couldn't malloc!\n");
+		return;
+	}
+
+	n = 0;
+	for (iter = clients_tab_order; iter; iter = iter->next) {
+		ci = iter->data;
+
+		if (client_compares(ci, c)) {
+			regions[n].x = ci->nx;
+			regions[n].y = ci->ny;
+			regions[n].w = ci->width;
+			regions[n].h = ci->height;
+			n++;
+		}
+	}
+	x = c->nx;
+	y = c->ny;
+	w = c->width;
+	h = c->height;
+
+	if (direction == SNAPUP) {
+		y--;
+		for (n = c->phy->yoff + c->border, i = 0; i < relevant; i++) {
+			if (!OVERLAP(c->nx - c->border,
+				     c->width - c->border, regions[i].x,
+				regions[i].w))
+				continue;
+			if (regions[i].y + regions[i].h <= y)
+				n = MAX(n, regions[i].y + regions[i].h);
+			if (regions[i].y <= y)
+				n = MAX(n, regions[i].y);
+			if (regions[i].y + regions[i].h <= y + h)
+				n = MAX(n, regions[i].y + regions[i].h - h);
+			if (regions[i].y <= y + h)
+				n = MAX(n, regions[i].y - h);
+		}
+		y = n;
+	}
+	if (direction == SNAPDOWN) {
+		y++;
+		for (n = c->phy->yoff - c->border + c->phy->height - c->border, i = 0; i < relevant; i++) {
+			if (!OVERLAP(c->nx - c->border,
+			    c->width - c->border, regions[i].x,
+				regions[i].w))
+				continue;
+			if (regions[i].y + regions[i].h >= y + h)
+				n = MIN(n, regions[i].y + regions[i].h);
+			if (regions[i].y >= y + h)
+				n = MIN(n, regions[i].y);
+			if (regions[i].y + regions[i].h >= y)
+				n = MIN(n, regions[i].y + regions[i].h + h);
+			if (regions[i].y >= y)
+				n = MIN(n, regions[i].y + h);
+		}
+		y = (n - h);
+	}
+	if (direction == SNAPLEFT) {
+		x--;
+		for (n = c->phy->xoff + c->border, i = 0; i < relevant; i++) {
+			if (!OVERLAP(c->ny - c->border, c->height - c->border,
+					regions[i].y,
+				regions[i].h))
+				continue;
+			if (regions[i].x + regions[i].w <= x)
+				n = MAX(n, regions[i].x + regions[i].w);
+			if (regions[i].x <= x)
+				n = MAX(n, regions[i].x);
+			if (regions[i].x + regions[i].w <= x + w)
+				n = MAX(n, regions[i].x + regions[i].w - w);
+			if (regions[i].x <= x + w)
+				n = MAX(n, regions[i].x - w);
+		}
+		x = n;
+	}
+	if (direction == SNAPRIGHT) {
+		x++;
+		for (n = c->phy->xoff - c->border + c->phy->width - c->border, i = 0; i < relevant; i++) {
+			if (!OVERLAP(c->ny - c->border, c->height - c->border, regions[i].y,
+				regions[i].h))
+				continue;
+			if (regions[i].x + regions[i].w >= x + w)
+				n = MIN(n, regions[i].x + regions[i].w);
+			if (regions[i].x >= x + w)
+				n = MIN(n, regions[i].x);
+			if (regions[i].x + regions[i].w >= x)
+				n = MIN(n, regions[i].x + regions[i].w + w);
+			if (regions[i].x >= x)
+				n = MIN(n, regions[i].x + w);
+		}
+		x = (n - w);
+	}
+	free(regions);
+
+	c->nx = x;
+	c->ny = y;
+	c->height = h;
+	c->width = w;
+
+	fprintf(stderr, "w: %d, h: %d, x: %d, y: %d", w, h, x, y);
+
+	client_calc_cog(c);
+	moveresize(c);
+}
+
+void
+drag(struct client * c)
 {
 	XEvent      ev;
 	int         x1, y1;	/* pointer position at start of grab in screen co-ordinates */
@@ -832,7 +957,8 @@ grab_keys_for_screen(struct screen_info * s)
 		KEY_TOPLEFT, KEY_TOPRIGHT, KEY_BOTTOMLEFT, KEY_BOTTOMRIGHT,
 		KEY_LEFT, KEY_RIGHT, KEY_DOWN, KEY_UP,
 		KEY_LOWER, KEY_ALTLOWER, KEY_INFO, KEY_MAXVERT, KEY_MAX,
-		KEY_FULLSCREEN, KEY_DOCK_TOGGLE, KEY_EXPAND
+		KEY_FULLSCREEN, KEY_DOCK_TOGGLE, KEY_EXPAND,
+		KEY_SNAPUP, KEY_SNAPDOWN, KEY_SNAPLEFT, KEY_SNAPRIGHT
 	};
 #define NUM_GRABS (int)(sizeof(keys_to_grab) / sizeof(KeySym))
 

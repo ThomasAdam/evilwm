@@ -99,6 +99,12 @@ typedef struct {
 #define MAXIMISE_VERT		(1<<1)
 #define MAXIMISE_FULLSCREEN	(1<<2)
 
+/* Snap */
+#define SNAPUP		0
+#define SNAPDOWN	1
+#define SNAPLEFT	2
+#define SNAPRIGHT	3
+
 /* some coding shorthand */
 
 #define ChildMask       (SubstructureRedirectMask|SubstructureNotifyMask)
@@ -307,6 +313,7 @@ void       *get_property(Window w, Atom property, Atom req_type,
 void        client_calc_cog(struct client *);
 void        client_calc_phy(struct client *);
 void	    client_expand(struct client *);
+void	    client_move_snap(struct client *, int);
 
 /* events.c */
 

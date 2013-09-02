@@ -211,6 +211,18 @@ handle_key_event(XKeyEvent * e)
 		case KEY_EXPAND:
 			client_expand(c);
 			break;
+		case KEY_SNAPUP:
+			client_move_snap(c, SNAPUP);
+			break;
+		case KEY_SNAPDOWN:
+			client_move_snap(c, SNAPDOWN);
+			break;
+		case KEY_SNAPLEFT:
+			client_move_snap(c, SNAPLEFT);
+			break;
+		case KEY_SNAPRIGHT:
+			client_move_snap(c, SNAPRIGHT);
+			break;
 		default:
 			break;
 	}

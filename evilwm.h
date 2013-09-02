@@ -30,6 +30,12 @@
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 
+#define NEAR(a,o,b) ((b) > (a)-(o) && (b) < (a)+(o))
+#define SNAPTO(a,o,b,j) (NEAR((a),(o),(b)) ? (a): (b)+(j))
+#define OVERLAP(a,b,c,d) (((a)==(c) && (b)==(d)) || MIN((a)+(b), (c)+(d)) - MAX((a), (c)) > 0)
+#define INTERSECT(x,y,w,h,x1,y1,w1,h1) (OVERLAP((x),(w),(x1),(w1)) && OVERLAP((y),(h),(y1),(h1)))
+
+
 /* Required for interpreting MWM hints: */
 #define _XA_MWM_HINTS           "_MOTIF_WM_HINTS"
 #define PROP_MWM_HINTS_ELEMENTS 3
@@ -42,6 +48,11 @@ typedef struct
 	unsigned long functions;
 	unsigned long decorations;
 } PropMwmHints;
+
+typedef struct {
+	short x, y, w, h, l, r, t, b;
+} workarea;
+
 
 /* sanity on options */
 #if defined(INFOBANNER_MOVERESIZE) && !defined(INFOBANNER)
@@ -293,8 +304,9 @@ void        set_wm_state(struct client * c, int state);
 void        set_shape(struct client * c);
 void       *get_property(Window w, Atom property, Atom req_type,
 	unsigned long *nitems_return);
-void        client_calc_cog(struct client * c);
-void        client_calc_phy(struct client * c);
+void        client_calc_cog(struct client *);
+void        client_calc_phy(struct client *);
+void	    client_expand(struct client *);
 
 /* events.c */
 

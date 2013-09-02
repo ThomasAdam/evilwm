@@ -228,7 +228,134 @@ snap_client(struct client * c)
 }
 
 void
-drag(struct client * c)
+client_expand(struct client *c)
+{
+	int		 c_screen_x = client_to_Xcoord(c, x);
+	int		 c_screen_y = client_to_Xcoord(c, y);
+	int		 i, n, relevant, x, y, w, h;
+	int		 mx, my, mh, mw;
+	int		 x1, y1, w1, h1;
+	struct list	*iter;
+	struct client	*ci;
+	workarea	*regions;
+
+	mx = my = mh = mw = 0;
+	x1 = y1 = w1 = h1 = 0;
+
+	fprintf(stderr, "Original client: %dx%d, pos: %dx%d, w: %d, h: %d\n",
+		c->nx, c->ny, c_screen_x, c_screen_y, c->width, c->height);
+
+	relevant = 0;
+	for (iter = clients_tab_order; iter != NULL; iter = iter->next) {
+		ci = iter->data;
+		if (ci == c)
+			continue;
+		if (ci->screen != c->screen)
+			continue;
+		if (!is_fixed(ci) && ci->vdesk != c->phy->vdesk)
+			continue;
+		if (ci->is_dock && !c->screen->docks_visible)
+			continue;
+
+		relevant++;
+	}
+
+	// list of coords/sizes for fully visible windows on this desktop
+	regions = malloc(sizeof(workarea) * relevant);
+	if (regions == NULL) {
+		fprintf(stderr, "Couldn't malloc!\n");
+		return;
+	}
+
+	n = 0;
+	for (iter = clients_tab_order; iter; iter = iter->next) {
+		ci = iter->data;
+
+		if (ci == c)
+			continue;
+		if (ci->screen != c->screen)
+			continue;
+		if (!is_fixed(ci) && ci->vdesk != c->phy->vdesk)
+			continue;
+		if (ci->is_dock && !c->screen->docks_visible)
+			continue;
+		if ((mw || mh)
+		    && !INTERSECT(ci->nx, ci->ny, ci->width, ci->height,
+			    mx, my, mw, mh))
+			continue;
+
+		regions[n].x = ci->nx;
+		regions[n].y = ci->ny;
+		regions[n].w = ci->width;
+		regions[n].h = ci->height;
+		n++;
+	}
+
+	x = c->nx;
+	y = c->ny;
+	w = c->width;
+	h = c->height;
+	if (w1 || h1) {
+		x = x1;
+		y = y1;
+		w = w1;
+		h = h1;
+	}
+
+	/* try to grow upward. locate the lower edge of the nearest fully
+	 * visible window
+	 */
+	for (n = c->phy->yoff, i = 0; i < relevant; i++)
+		if (regions[i].y + regions[i].h <= y &&
+			OVERLAP(x, w, regions[i].x, regions[i].w))
+			n = MAX(n, regions[i].y + regions[i].h);
+
+	h += (y - n) - c->border;
+	y = n + c->border;
+
+	/* try to grow downward. locate the upper edge of the nearest
+	 * fully visible window
+	 */
+	for (n = c->phy->yoff + c->phy->height, i = 0; i < relevant; i++)
+		if (regions[i].y >= y + h &&
+		    OVERLAP(x, w, regions[i].x, regions[i].w))
+			n = MIN(n, regions[i].y);
+
+	h = (n - y) - c->border * 2;
+
+	/* try to grow left. locate the right edge of the nearest fully visible
+	 * window.
+	 */
+	for (n = c->phy->xoff, i = 0; i < relevant; i++)
+		if (regions[i].x + regions[i].w <= x &&
+		    OVERLAP(y, h, regions[i].y, regions[i].h))
+			n = MAX(n, regions[i].x + regions[i].w);
+
+	w += (x - n) - c->border;
+	x = n + c->border;
+
+	/* try to grow right. locate the left edge of the nearest fully visible
+	 * window
+	 */
+	for (n = c->phy->xoff + c->phy->width, i = 0; i < relevant; i++)
+		if (regions[i].x >= x + w &&
+		    OVERLAP(y, h, regions[i].y, regions[i].h))
+			n = MIN(n, regions[i].x);
+
+	w = (n - x) - c->border;
+
+	c->nx = x;
+	c->ny = y;
+	c->height = h;
+	c->width = w;
+
+	fprintf(stderr, "w: %d, h: %d, x: %d, y: %d", w, h, x, y);
+
+	moveresize(c);
+}
+
+void
+drag(struct client *c)
 {
 	XEvent      ev;
 	int         x1, y1;	/* pointer position at start of grab in screen co-ordinates */
@@ -641,10 +768,15 @@ find_current_screen_and_phy(struct screen_info ** current_screen,
 struct physical_screen *
 find_physical_screen(struct screen_info * screen, int screen_x, int screen_y)
 {
+<<<<<<< HEAD
 	struct physical_screen *phy = NULL;
+=======
+	PhysicalScreen *phy = NULL;
+	unsigned int	i = 0;
+>>>>>>> f2bafdf... First stab at expand; logic mostly from goomwwm
 
 	/* Find if (screen_x,y) is on any physical screen */
-	for (unsigned i = 0; i < (unsigned) screen->num_physical; i++) {
+	for (i = 0; i < (unsigned) screen->num_physical; i++) {
 		phy = &screen->physical[i];
 		if (screen_x >= phy->xoff && screen_x <= phy->xoff + phy->width
 			&& screen_y >= phy->yoff
@@ -656,8 +788,13 @@ find_physical_screen(struct screen_info * screen, int screen_x, int screen_y)
 	 * physical screen centre to (screen_x,y) */
 	int         val = INT_MAX;
 
+<<<<<<< HEAD
 	for (unsigned i = 0; i < (unsigned) screen->num_physical; i++) {
 		struct physical_screen *p = &screen->physical[i];
+=======
+	for (i = 0; i < (unsigned) screen->num_physical; i++) {
+		PhysicalScreen *p = &screen->physical[i];
+>>>>>>> f2bafdf... First stab at expand; logic mostly from goomwwm
 
 		int         dx = screen_x - p->xoff - p->width / 2;
 		int         dy = screen_y - p->yoff - p->height / 2;
@@ -699,7 +836,7 @@ grab_keys_for_screen(struct screen_info * s)
 		KEY_TOPLEFT, KEY_TOPRIGHT, KEY_BOTTOMLEFT, KEY_BOTTOMRIGHT,
 		KEY_LEFT, KEY_RIGHT, KEY_DOWN, KEY_UP,
 		KEY_LOWER, KEY_ALTLOWER, KEY_INFO, KEY_MAXVERT, KEY_MAX,
-		KEY_FULLSCREEN, KEY_DOCK_TOGGLE
+		KEY_FULLSCREEN, KEY_DOCK_TOGGLE, KEY_EXPAND
 	};
 #define NUM_GRABS (int)(sizeof(keys_to_grab) / sizeof(KeySym))
 

@@ -23,4 +23,6 @@ struct list *list_to_tail(struct list *list, void *data);
 /* Returns element in list: */
 struct list *list_find(struct list *list, void *data);
 
+size_t	     list_size(struct list *);
+
 #endif /* def __LIST_H__ */

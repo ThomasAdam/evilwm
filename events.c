@@ -208,6 +208,9 @@ handle_key_event(XKeyEvent * e)
 				client_to_vdesk(c, VDESK_FIXED);
 			}
 			break;
+		case KEY_EXPAND:
+			client_expand(c);
+			break;
 		default:
 			break;
 	}

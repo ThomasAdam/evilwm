@@ -112,3 +112,15 @@ list_find(struct list *list, void *data)
 	}
 	return NULL;
 }
+
+size_t
+list_size(struct list *list)
+{
+	struct list	*elem;
+	size_t		 size = 0;
+
+	for (elem = list; elem != NULL; elem = elem->next)
+		size++;
+
+	return (size);
+}

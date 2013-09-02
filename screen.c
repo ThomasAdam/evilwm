@@ -245,6 +245,20 @@ client_expand(struct client *c)
 	fprintf(stderr, "Original client: %dx%d, pos: %dx%d, w: %d, h: %d\n",
 		c->nx, c->ny, c_screen_x, c_screen_y, c->width, c->height);
 
+	if (c->oldx || c->oldy || c->oldw || c->oldh)
+	{
+		c->nx = c->oldx;
+		c->ny = c->oldy;
+		c->width = c->oldw;
+		c->height = c->oldh;
+
+		c->oldx = c->oldy = c->oldw = c->oldh = 0;
+
+		moveresize(c);
+
+		return;
+	}
+
 	relevant = 0;
 	for (iter = clients_tab_order; iter != NULL; iter = iter->next) {
 		ci = iter->data;
@@ -310,8 +324,8 @@ client_expand(struct client *c)
 			OVERLAP(x, w, regions[i].x, regions[i].w))
 			n = MAX(n, regions[i].y + regions[i].h);
 
-	h += (y - n) - c->border;
-	y = n + c->border;
+	h += (y - n) - c->border * 2;
+	y = n + c->border * 2;
 
 	/* try to grow downward. locate the upper edge of the nearest
 	 * fully visible window
@@ -331,8 +345,8 @@ client_expand(struct client *c)
 		    OVERLAP(y, h, regions[i].y, regions[i].h))
 			n = MAX(n, regions[i].x + regions[i].w);
 
-	w += (x - n) - c->border;
-	x = n + c->border;
+	w += (x - n) - c->border * 2;
+	x = n + c->border * 2;
 
 	/* try to grow right. locate the left edge of the nearest fully visible
 	 * window
@@ -342,7 +356,12 @@ client_expand(struct client *c)
 		    OVERLAP(y, h, regions[i].y, regions[i].h))
 			n = MIN(n, regions[i].x);
 
-	w = (n - x) - c->border;
+	w = (n - x) - c->border * 2;
+
+	c->oldx = c->nx;
+	c->oldy = c->ny;
+	c->oldw = c->width;
+	c->oldh = c->height;
 
 	c->nx = x;
 	c->ny = y;
@@ -351,7 +370,10 @@ client_expand(struct client *c)
 
 	fprintf(stderr, "w: %d, h: %d, x: %d, y: %d", w, h, x, y);
 
+	client_calc_cog(c);
+	ewmh_set_net_wm_state(c);
 	moveresize(c);
+	discard_enter_events(c);
 }
 
 void

@@ -11,6 +11,7 @@
 
 static void grab_keysym(Window w, unsigned int mask, KeySym keysym);
 static void fix_screen_client(struct client * c, const struct physical_screen * old_phy);
+static bool client_compares(struct client *, struct client *);
 
 static void
 recalculate_sweep(struct client * c, int x1, int y1, int x2, int y2, unsigned force)
@@ -167,14 +168,10 @@ snap_client(struct client * c)
 		int         ci_screen_x = client_to_Xcoord(ci, x);
 		int         ci_screen_y = client_to_Xcoord(ci, y);
 
-		if (ci == c)
+
+		if (!client_compares(ci, c))
 			continue;
-		if (ci->screen != c->screen)
-			continue;
-		if (!is_fixed(ci) && ci->vdesk != c->phy->vdesk)
-			continue;
-		if (ci->is_dock && !c->screen->docks_visible)
-			continue;
+
 		if (ci_screen_y - ci->border - c->border - c->height -
 			c_screen_y <= opt_snap
 			&& c_screen_y - c->border - ci->border - ci->height -
@@ -227,20 +224,30 @@ snap_client(struct client * c)
 		c->ny = 0;
 }
 
+bool
+client_compares(struct client *ca, struct client *cb)
+{
+	if (ca == cb)
+		return false;
+	if (ca->screen != cb->screen)
+		return false;
+	if (!is_fixed(cb) && cb->vdesk != ca->phy->vdesk)
+		return false;
+	if (cb->is_dock && !ca->screen->docks_visible)
+		return false;
+
+	return true;
+}
+
 void
 client_expand(struct client *c)
 {
 	int		 c_screen_x = client_to_Xcoord(c, x);
 	int		 c_screen_y = client_to_Xcoord(c, y);
 	int		 i, n, relevant, x, y, w, h;
-	int		 mx, my, mh, mw;
-	int		 x1, y1, w1, h1;
 	struct list	*iter;
 	struct client	*ci;
 	workarea	*regions;
-
-	mx = my = mh = mw = 0;
-	x1 = y1 = w1 = h1 = 0;
 
 	fprintf(stderr, "Original client: %dx%d, pos: %dx%d, w: %d, h: %d\n",
 		c->nx, c->ny, c_screen_x, c_screen_y, c->width, c->height);
@@ -262,16 +269,9 @@ client_expand(struct client *c)
 	relevant = 0;
 	for (iter = clients_tab_order; iter != NULL; iter = iter->next) {
 		ci = iter->data;
-		if (ci == c)
-			continue;
-		if (ci->screen != c->screen)
-			continue;
-		if (!is_fixed(ci) && ci->vdesk != c->phy->vdesk)
-			continue;
-		if (ci->is_dock && !c->screen->docks_visible)
-			continue;
 
-		relevant++;
+		if (client_compares(ci, c))
+			relevant++;
 	}
 
 	// list of coords/sizes for fully visible windows on this desktop
@@ -285,36 +285,19 @@ client_expand(struct client *c)
 	for (iter = clients_tab_order; iter; iter = iter->next) {
 		ci = iter->data;
 
-		if (ci == c)
-			continue;
-		if (ci->screen != c->screen)
-			continue;
-		if (!is_fixed(ci) && ci->vdesk != c->phy->vdesk)
-			continue;
-		if (ci->is_dock && !c->screen->docks_visible)
-			continue;
-		if ((mw || mh)
-		    && !INTERSECT(ci->nx, ci->ny, ci->width, ci->height,
-			    mx, my, mw, mh))
-			continue;
-
-		regions[n].x = ci->nx;
-		regions[n].y = ci->ny;
-		regions[n].w = ci->width;
-		regions[n].h = ci->height;
-		n++;
+		if (client_compares(ci, c)) {
+			regions[n].x = ci->nx;
+			regions[n].y = ci->ny;
+			regions[n].w = ci->width;
+			regions[n].h = ci->height;
+			n++;
+		}
 	}
 
 	x = c->nx;
 	y = c->ny;
 	w = c->width;
 	h = c->height;
-	if (w1 || h1) {
-		x = x1;
-		y = y1;
-		w = w1;
-		h = h1;
-	}
 
 	/* try to grow upward. locate the lower edge of the nearest fully
 	 * visible window
@@ -324,8 +307,8 @@ client_expand(struct client *c)
 			OVERLAP(x, w, regions[i].x, regions[i].w))
 			n = MAX(n, regions[i].y + regions[i].h);
 
-	h += (y - n) - c->border * 2;
-	y = n + c->border * 2;
+	h += (y - n) - c->border - c->border;
+	y = n + (c->border * 2);
 
 	/* try to grow downward. locate the upper edge of the nearest
 	 * fully visible window
@@ -335,7 +318,7 @@ client_expand(struct client *c)
 		    OVERLAP(x, w, regions[i].x, regions[i].w))
 			n = MIN(n, regions[i].y);
 
-	h = (n - y) - c->border * 2;
+	h = (n - y) - (c->border * 2);
 
 	/* try to grow left. locate the right edge of the nearest fully visible
 	 * window.
@@ -345,8 +328,8 @@ client_expand(struct client *c)
 		    OVERLAP(y, h, regions[i].y, regions[i].h))
 			n = MAX(n, regions[i].x + regions[i].w);
 
-	w += (x - n) - c->border * 2;
-	x = n + c->border * 2;
+	w += (x - n) - (c->border * 2);
+	x = n + c->border + c->border;
 
 	/* try to grow right. locate the left edge of the nearest fully visible
 	 * window
@@ -356,7 +339,9 @@ client_expand(struct client *c)
 		    OVERLAP(y, h, regions[i].y, regions[i].h))
 			n = MIN(n, regions[i].x);
 
-	w = (n - x) - c->border * 2;
+	w = (n - x) - (c->border * 2);
+
+	free(regions);
 
 	c->oldx = c->nx;
 	c->oldy = c->ny;
@@ -371,9 +356,7 @@ client_expand(struct client *c)
 	fprintf(stderr, "w: %d, h: %d, x: %d, y: %d", w, h, x, y);
 
 	client_calc_cog(c);
-	ewmh_set_net_wm_state(c);
 	moveresize(c);
-	discard_enter_events(c);
 }
 
 void
@@ -790,12 +773,8 @@ find_current_screen_and_phy(struct screen_info ** current_screen,
 struct physical_screen *
 find_physical_screen(struct screen_info * screen, int screen_x, int screen_y)
 {
-<<<<<<< HEAD
 	struct physical_screen *phy = NULL;
-=======
-	PhysicalScreen *phy = NULL;
 	unsigned int	i = 0;
->>>>>>> f2bafdf... First stab at expand; logic mostly from goomwwm
 
 	/* Find if (screen_x,y) is on any physical screen */
 	for (i = 0; i < (unsigned) screen->num_physical; i++) {
@@ -810,13 +789,8 @@ find_physical_screen(struct screen_info * screen, int screen_x, int screen_y)
 	 * physical screen centre to (screen_x,y) */
 	int         val = INT_MAX;
 
-<<<<<<< HEAD
-	for (unsigned i = 0; i < (unsigned) screen->num_physical; i++) {
-		struct physical_screen *p = &screen->physical[i];
-=======
 	for (i = 0; i < (unsigned) screen->num_physical; i++) {
-		PhysicalScreen *p = &screen->physical[i];
->>>>>>> f2bafdf... First stab at expand; logic mostly from goomwwm
+		struct physical_screen *p = &screen->physical[i];
 
 		int         dx = screen_x - p->xoff - p->width / 2;
 		int         dy = screen_y - p->yoff - p->height / 2;

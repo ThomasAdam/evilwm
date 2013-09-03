@@ -1,11 +1,27 @@
-Desired functionality for 1.1.x:
-   * EWMH support, including:
-        + Client control via root window messages.
-   * A few things can probably cease to be compile-time options.
-   * Better interoperation with Xinerama (David Flynn has some patches
-     for this).
-   * Option for new windows to tile as well as possible.
+* Better config file support.
+        - Make better use of command-line options as a config file,
 
-Desired functionality for 1.2.x:
+* Consider tmux to be a good model for window behaviour:
+        - status-line (as a window list) via dzen2---but in what format?
+        - Configuration:  defaults hard-coded, then overridden in config
+          file.
+        - linking a window (like "fixed" is now) should have separate
+          geometry per workspace.
+        - hooks?
+        - Window/workspace actions via command-prompt (just like ratpoison).
 
-   * EWMH compliance.
+* Tidy up internal structs
+        - Don't use typedefs.
+        - Create a geometry struct to hold size/position information and
+          update that for operations including maximise.
+        - Rather than hand-rolling linked-lists, use TAILQ/RB_TREE for
+          storage/linking?  How is that handled on non-BSD systems?
+
+* EWMH support.
+
+* Unmanaged windows need handling.
+
+* Key/mouse bindings need supporting via config.
+        - Don't enforce XK_ prefix for key bindings.
+        - What about allow a leader-key (like prefix-key in tmux) for some
+          operations; perhaps specified via config file?

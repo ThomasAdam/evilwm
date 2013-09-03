@@ -15,34 +15,40 @@ static void fix_screen_client(struct client * c, const struct physical_screen * 
 static void
 recalculate_sweep(struct client * c, int x1, int y1, int x2, int y2, unsigned force)
 {
-	if (force || c->oldw == 0) {
-		c->oldw = 0;
-		c->width = abs(x1 - x2);
-		c->width -= (c->width - c->base_width) % c->width_inc;
-		if (c->min_width && c->width < c->min_width)
-			c->width = c->min_width;
-		if (c->max_width && c->width > c->max_width)
-			c->width = c->max_width;
-		c->nx = (x1 <= x2) ? x1 : x1 - c->width;
+	struct geometry	*g, *gp;
+
+	g = &c->current;
+	gp = &c->prev;
+
+	if (force || gp->w == 0) {
+		gp->w = 0;
+		g->w = abs(x1 - x2);
+		g->w -= (g->w - c->hints.base_width) % c->hints.width_inc;
+		if (c->hints.min_width && g->w < c->hints.min_width)
+			g->w = c->hints.min_width;
+		if (c->hints.max_width && g->w > c->hints.max_width)
+			g->w = c->hints.max_width;
+		g->x = (x1 <= x2) ? x1 : x1 - g->w;
 	}
-	if (force || c->oldh == 0) {
-		c->oldh = 0;
-		c->height = abs(y1 - y2);
-		c->height -= (c->height - c->base_height) % c->height_inc;
-		if (c->min_height && c->height < c->min_height)
-			c->height = c->min_height;
-		if (c->max_height && c->height > c->max_height)
-			c->height = c->max_height;
-		c->ny = (y1 <= y2) ? y1 : y1 - c->height;
+	if (force || gp->h == 0) {
+		gp->h = 0;
+		g->h = abs(y1 - y2);
+		g->h -= (g->h - c->hints.base_height) % c->hints.height_inc;
+		if (c->hints.min_height && g->h < c->hints.min_height)
+			g->h = c->hints.min_height;
+		if (c->hints.max_height && g->h > c->hints.max_height)
+			g->h = c->hints.max_height;
+		g->y = (y1 <= y2) ? y1 : y1 - g->h;
 	}
 }
 
 void
 sweep(struct client * c)
 {
-	XEvent      ev;
-	int         old_cx = client_to_Xcoord(c, x);
-	int         old_cy = client_to_Xcoord(c, y);
+	struct geometry	*g = &c->current;
+	XEvent		 ev;
+	int		 old_cx = client_to_Xcoord(c, x);
+	int		 old_cy = client_to_Xcoord(c, y);
 
 	if (!grab_pointer(c->screen->root, MouseMask, resize_curs))
 		return;
@@ -50,7 +56,7 @@ sweep(struct client * c)
 	client_raise(c);
 	annotate_create(c, &annotate_sweep_ctx);
 
-	setmouse(c->window, c->width, c->height);
+	setmouse(c->window, g->w, g->h);
 	for (;;) {
 		XMaskEvent(dpy, MouseMask, &ev);
 		switch (ev.type) {
@@ -63,8 +69,8 @@ sweep(struct client * c)
 				recalculate_sweep(c, old_cx, old_cy,
 					ev.xmotion.x, ev.xmotion.y,
 					ev.xmotion.state & altmask);
-				c->nx -= c->phy->xoff;
-				c->ny -= c->phy->yoff;
+				g->x -= c->phy->xoff;
+				g->y -= c->phy->yoff;
 				client_calc_cog(c);
 				client_calc_phy(c);
 				annotate_update(c, &annotate_sweep_ctx);
@@ -152,20 +158,22 @@ absmin(int a, int b)
 static void
 snap_client(struct client * c)
 {
-	int         dx, dy;
-	struct list *iter;
-	struct client     *ci;
+	int		 dx, dy;
+	struct list	*iter;
+	struct client	*ci;
+	struct geometry	*g, *g_ci;
+	int		 c_screen_x = client_to_Xcoord(c, x);
+	int		 c_screen_y = client_to_Xcoord(c, y);
+	int		 ci_screen_x, ci_screen_y;
 
-	/* client in screen co-ordinates */
-	int         c_screen_x = client_to_Xcoord(c, x);
-	int         c_screen_y = client_to_Xcoord(c, y);
+	g = &c->current;
 
 	/* snap to other windows */
 	dx = dy = opt_snap;
 	for (iter = clients_tab_order; iter; iter = iter->next) {
 		ci = iter->data;
-		int         ci_screen_x = client_to_Xcoord(ci, x);
-		int         ci_screen_y = client_to_Xcoord(ci, y);
+		ci_screen_x = client_to_Xcoord(ci, x);
+		ci_screen_y = client_to_Xcoord(ci, y);
 
 		if (ci == c)
 			continue;
@@ -175,68 +183,74 @@ snap_client(struct client * c)
 			continue;
 		if (ci->is_dock && !c->screen->docks_visible)
 			continue;
-		if (ci_screen_y - ci->border - c->border - c->height -
+
+		g_ci = &ci->current;
+
+		if (ci_screen_y - g_ci->border_width - g->border_width - g->h -
 			c_screen_y <= opt_snap
-			&& c_screen_y - c->border - ci->border - ci->height -
+			&& c_screen_y - g->border_width - g_ci->border_width - g_ci->h -
 			ci_screen_y <= opt_snap) {
 			dx = absmin(dx,
-				ci_screen_x + ci->width - c_screen_x +
-				c->border + ci->border);
+				ci_screen_x + g_ci->w - c_screen_x +
+				g->border_width + g_ci->border_width);
 			dx = absmin(dx,
-				ci_screen_x + ci->width - c_screen_x -
-				c->width);
+				ci_screen_x + g_ci->w - c_screen_x -
+				g->w);
 			dx = absmin(dx,
-				ci_screen_x - c_screen_x - c->width -
-				c->border - ci->border);
+				ci_screen_x - c_screen_x - g->w -
+				g->border_width - g_ci->border_width);
 			dx = absmin(dx, ci_screen_x - c_screen_x);
 		}
-		if (ci_screen_x - ci->border - c->border - c->width -
+		if (ci_screen_x - g_ci->border_width - g->border_width - g->w -
 			c_screen_x <= opt_snap
-			&& c_screen_x - c->border - ci->border - ci->width -
+			&& c_screen_x - g->border_width - g_ci->border_width - g_ci->w -
 			ci_screen_x <= opt_snap) {
 			dy = absmin(dy,
-				ci_screen_y + ci->height - c_screen_y +
-				c->border + ci->border);
+				ci_screen_y + g_ci->h - c_screen_y +
+				g->border_width + g_ci->border_width);
 			dy = absmin(dy,
-				ci_screen_y + ci->height - c_screen_y -
-				c->height);
+				ci_screen_y + g_ci->h - c_screen_y -
+				g->h);
 			dy = absmin(dy,
-				ci_screen_y - c_screen_y - c->height -
-				c->border - ci->border);
+				ci_screen_y - c_screen_y - g->h -
+				g->border_width - g_ci->border_width);
 			dy = absmin(dy, ci_screen_y - c_screen_y);
 		}
 	}
 	if (abs(dx) < opt_snap)
-		c->nx += dx;
+		g->x += dx;
 	if (abs(dy) < opt_snap)
-		c->ny += dy;
+		g->y += dy;
 
 	/* snap to screen border */
-	if (abs(c->nx - c->border) < opt_snap)
-		c->nx = c->border;
-	if (abs(c->ny - c->border) < opt_snap)
-		c->ny = c->border;
-	if (abs(c->nx + c->width + c->border - c->phy->width) < opt_snap)
-		c->nx = c->phy->width - c->width - c->border;
-	if (abs(c->ny + c->height + c->border - c->phy->height) < opt_snap)
-		c->ny = c->phy->height - c->height - c->border;
+	if (abs(g->x - g->border_width) < opt_snap)
+		g->x = g->border_width;
+	if (abs(g->y - g->border_width) < opt_snap)
+		g->y = g->border_width;
+	if (abs(g->x + g->w + g->border_width - c->phy->width) < opt_snap)
+		g->x = c->phy->width - g->w - g->border_width;
+	if (abs(g->y + g->h + g->border_width - c->phy->height) < opt_snap)
+		g->y = c->phy->height - g->h - g->border_width;
 
-	if (abs(c->nx) == c->border && c->width == c->phy->width)
-		c->nx = 0;
-	if (abs(c->ny) == c->border && c->height == c->phy->height)
-		c->ny = 0;
+	if (abs(g->x) == g->border_width && g->w == c->phy->width)
+		g->x = 0;
+	if (abs(g->y) == g->border_width && g->h == c->phy->height)
+		g->y = 0;
 }
 
 void
 drag(struct client * c)
 {
-	XEvent      ev;
-	int         x1, y1;	/* pointer position at start of grab in screen co-ordinates */
-	int         old_screen_x = client_to_Xcoord(c, x);
-	int         old_screen_y = client_to_Xcoord(c, y);;
+	struct geometry	 g = c->current;
+	XEvent		 ev;
+	int		 x1, y1;	/* pointer position at start of grab in screen co-ordinates */
+	int		 screen_x, screen_y;
+	int		 old_screen_x = client_to_Xcoord(c, x);
+	int		 old_screen_y = client_to_Xcoord(c, y);;
 
 	if (!grab_pointer(c->screen->root, MouseMask, move_curs))
 		return;
+
 	client_raise(c);
 	get_mouse_position(&x1, &y1, c->screen->root);
 	annotate_create(c, &annotate_drag_ctx);
@@ -247,10 +261,8 @@ drag(struct client * c)
 				if (ev.xmotion.root != c->screen->root)
 					break;
 				annotate_preupdate(c, &annotate_drag_ctx);
-				int         screen_x =
-					old_screen_x + (ev.xmotion.x - x1);
-				int         screen_y =
-					old_screen_y + (ev.xmotion.y - y1);
+				screen_x = old_screen_x + (ev.xmotion.x - x1);
+				screen_y = old_screen_y + (ev.xmotion.y - y1);
 				client_update_screenpos(c, screen_x, screen_y);
 				client_calc_phy(c);
 				if (opt_snap && !(ev.xmotion.state & altmask))
@@ -258,10 +270,10 @@ drag(struct client * c)
 
 				if (!no_solid_drag) {
 					XMoveWindow(dpy, c->parent,
-						client_to_Xcoord(c,
-							x) - c->border,
-						client_to_Xcoord(c,
-							y) - c->border);
+						client_to_Xcoord(c, x) -
+						    g.border_width,
+						client_to_Xcoord(c,y) -
+						    g.border_width);
 					send_config(c);
 				}
 				annotate_update(c, &annotate_drag_ctx);
@@ -283,18 +295,21 @@ drag(struct client * c)
 void
 position_policy(struct client * c)
 {
-	c->nx = MAX(1 - c->width - c->border, MIN(c->nx, c->phy->width));
-	c->ny = MAX(1 - c->height - c->border, MIN(c->ny, c->phy->height));
+	struct geometry	*g = &c->current;
+	g->x = MAX(1 - g->w - g->border_width, MIN(g->x, c->phy->width));
+	g->y = MAX(1 - g->h - g->border_width, MIN(g->y, c->phy->height));
 }
 
 void
 moveresize(struct client * c)
 {
+	struct geometry	 g = c->current;
+
 	position_policy(c);
 	XMoveResizeWindow(dpy, c->parent,
-		client_to_Xcoord(c, x) - c->border, client_to_Xcoord(c,
-			y) - c->border, c->width, c->height);
-	XMoveResizeWindow(dpy, c->window, 0, 0, c->width, c->height);
+		client_to_Xcoord(c, x) - g.border_width,
+		client_to_Xcoord(c,y) - g.border_width, g.w, g.h);
+	XMoveResizeWindow(dpy, c->window, 0, 0, g.w, g.h);
 	send_config(c);
 }
 
@@ -308,16 +323,19 @@ moveresizeraise(struct client * c)
 void
 maximise_client(struct client * c, int action, int hv)
 {
+	struct geometry	*g = &c->current;
+	struct geometry *gp = &c->prev;
+
 	if (hv & MAXIMISE_FULLSCREEN)
 		hv |= MAXIMISE_HORZ|MAXIMISE_VERT;
 
 	if (hv & MAXIMISE_HORZ) {
-		if (c->oldw) {
+		if (gp->w) {
 			if (action == NET_WM_STATE_REMOVE
 				|| action == NET_WM_STATE_TOGGLE) {
-				c->nx = c->oldx;
-				c->width = c->oldw;
-				c->oldw = 0;
+				g->x = gp->x;
+				g->w = gp->w;
+				gp->w = 0;
 				XDeleteProperty(dpy, c->window,
 					xa_evilwm_unmaximised_horz);
 			}
@@ -326,12 +344,12 @@ maximise_client(struct client * c, int action, int hv)
 				|| action == NET_WM_STATE_TOGGLE) {
 				unsigned long props[2];
 
-				c->oldx = c->nx;
-				c->oldw = c->width;
-				c->nx = 0 + c->border;
-				c->width = c->phy->width - c->border * 2;
-				props[0] = c->oldx;
-				props[1] = c->oldw;
+				gp->x = g->x;
+				gp->w = g->w;
+				g->x = 0 + g->border_width;
+				g->w = c->phy->width - g->border_width * 2;
+				props[0] = gp->x;
+				props[1] = gp->w;
 				XChangeProperty(dpy, c->window,
 					xa_evilwm_unmaximised_horz,
 					XA_CARDINAL, 32, PropModeReplace,
@@ -340,12 +358,12 @@ maximise_client(struct client * c, int action, int hv)
 		}
 	}
 	if (hv & MAXIMISE_VERT) {
-		if (c->oldh) {
+		if (g->h) {
 			if (action == NET_WM_STATE_REMOVE
 				|| action == NET_WM_STATE_TOGGLE) {
-				c->ny = c->oldy;
-				c->height = c->oldh;
-				c->oldh = 0;
+				g->y = gp->y;
+				g->h = gp->h;
+				gp->h = 0;
 				XDeleteProperty(dpy, c->window,
 					xa_evilwm_unmaximised_vert);
 			}
@@ -354,12 +372,12 @@ maximise_client(struct client * c, int action, int hv)
 				|| action == NET_WM_STATE_TOGGLE) {
 				unsigned long props[2];
 
-				c->oldy = c->ny;
-				c->oldh = c->height;
-				c->ny = 0 + c->border;
-				c->height = c->phy->height - c->border * 2;
-				props[0] = c->oldy;
-				props[1] = c->oldh;
+				gp->y = g->y;
+				gp->h = g->h;
+				g->y = 0 + g->border_width;
+				g->h = c->phy->height - g->border_width * 2;
+				props[0] = gp->y;
+				props[1] = gp->h;
 				XChangeProperty(dpy, c->window,
 					xa_evilwm_unmaximised_vert,
 					XA_CARDINAL, 32, PropModeReplace,
@@ -378,21 +396,21 @@ maximise_client(struct client * c, int action, int hv)
 
 			XGetWindowAttributes(dpy, c->parent, &attr);
 			if (attr.border_width != 0) {
-				c->old_border = c->border;
-				c->border = 0;
-				c->nx = c->ny = 0;
-				c->width = c->phy->width;
-				c->height = c->phy->height;
+				gp->border_width = g->border_width;
+				g->border_width = 0;
+				g->x = g->y = 0;
+				g->w = c->phy->width;
+				g->h = c->phy->height;
 				XSetWindowBorderWidth(dpy, c->parent, 0);
 			} else {
 
 				XSetWindowBorderWidth(dpy, c->parent,
-					c->old_border);
-				c->border = c->old_border;
+					gp->border_width);
+				g->border_width = gp->border_width;
 			}
 		} else {
-			XSetWindowBorderWidth(dpy, c->parent, c->old_border);
-			c->border = c->old_border;
+			XSetWindowBorderWidth(dpy, c->parent, gp->border_width);
+			g->border_width = gp->border_width;
 		}
 
 	}
@@ -436,8 +454,8 @@ next(void)
 	client_raise(newc);
 	select_client(newc);
 #ifdef WARP_POINTER
-	setmouse(newc->window, newc->width + newc->border - 1,
-		newc->height + newc->border - 1);
+	setmouse(newc->window, newc->current.w + newc->current.border_width - 1,
+		newc->current.h + newc->current.border_width - 1);
 #endif
 	discard_enter_events(newc);
 }
@@ -566,27 +584,31 @@ scale_pos(int new_screen_size, int old_screen_size, int cli_pos, int cli_size,
 static void
 fix_screen_client(struct client * c, const struct physical_screen * old_phy)
 {
-	int         oldw = old_phy->width;
-	int         oldh = old_phy->height;
-	int         neww = c->phy->width;
-	int         newh = c->phy->height;
+	struct geometry	*g, *gp;
+	int		 oldw = old_phy->width;
+	int		 oldh = old_phy->height;
+	int		 neww = c->phy->width;
+	int		 newh = c->phy->height;
 
-	if (c->oldw) {
+	g = &c->current;
+	gp = &c->prev;
+
+	if (gp->w) {
 		/* horiz maximised: update width, update old x pos */
-		c->width = neww;
-		c->oldx = scale_pos(neww, oldw, c->oldx, c->oldw, c->border);
+		g->w = neww;
+		gp->x = scale_pos(neww, oldw, gp->x, gp->w, g->border_width);
 	} else {
 		/* horiz normal: update x pos */
-		c->nx = scale_pos(neww, oldw, c->nx, c->width, c->border);
+		g->x = scale_pos(neww, oldw, g->x, g->w, g->border_width);
 	}
 
-	if (c->oldh) {
+	if (gp->h) {
 		/* vert maximised: update height, update old y pos */
-		c->height = newh;
-		c->oldy = scale_pos(newh, oldh, c->oldy, c->oldh, c->border);
+		g->h = newh;
+		gp->y = scale_pos(newh, oldh, gp->y, gp->h, g->border_width);
 	} else {
 		/* vert normal: update y pos */
-		c->ny = scale_pos(newh, oldh, c->ny, c->height, c->border);
+		g->y = scale_pos(newh, oldh, g->y, g->h, g->border_width);
 	}
 
 	client_calc_cog(c);

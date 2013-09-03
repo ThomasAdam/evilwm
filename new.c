@@ -24,10 +24,11 @@ static void debug_wm_normal_hints(XSizeHints * size);
 void
 make_new_client(Window w, struct screen_info * s)
 {
-	struct client     *c;
-	char       *name;
-	XClassHint *class;
-	unsigned int window_type;
+	struct client		*c;
+	struct geometry		*g;
+	char			*name;
+	XClassHint		*class;
+	unsigned int		 window_type;
 
 	LOG_ENTER("make_new_client(window=%lx)", w);
 
@@ -67,9 +68,7 @@ make_new_client(Window w, struct screen_info * s)
 		return;
 	}
 
-	c = malloc(sizeof(struct client));
-	/* Don't crash the window manager, just fail the operation. */
-	if (!c) {
+	if ((c = malloc(sizeof *c)) == NULL) {
 		LOG_ERROR("out of memory in new_client; limping onward\n");
 		LOG_LEAVE();
 		XUngrabServer(dpy);
@@ -83,13 +82,18 @@ make_new_client(Window w, struct screen_info * s)
 	c->window = w;
 	c->ignore_unmap = 0;
 	c->remove = 0;
+	memset(&c->current, 0, sizeof(struct geometry));
+	memset(&c->prev, 0, sizeof(struct geometry));
+
+	/* The window's current geometry when it's mapped. */
+	g = &c->current;
 
 	/* Ungrab the X server as soon as possible. Now that the client is
 	 * malloc()ed and attached to the list, it is safe for any subsequent
 	 * X calls to raise an X error and thus flag it for removal. */
 	XUngrabServer(dpy);
 
-	c->border = opt_bw;
+	c->current.border_width = opt_bw;
 
 	update_window_type_flags(c, window_type);
 	init_geometry(c);
@@ -136,9 +140,9 @@ make_new_client(Window w, struct screen_info * s)
 						&& !strcmp(class->res_class,
 							a->res_class)))) {
 				if (a->geometry_mask & WidthValue)
-					c->width = a->width * c->width_inc;
+					g->w = a->width * c->hints.width_inc;
 				if (a->geometry_mask & HeightValue)
-					c->height = a->height * c->height_inc;
+					g->h = a->height * c->hints.height_inc;
 				/* Warning: these co-ordinates are in screen co-ordinates */
 				int         screen_x, screen_y;
 
@@ -146,13 +150,11 @@ make_new_client(Window w, struct screen_info * s)
 					screen_x = client_to_Xcoord(c, x);
 				} else {
 					if (a->geometry_mask & XNegative)
-						screen_x =
-							a->x +
-							DisplayWidth(dpy,
-							s->screen) - c->width -
-							c->border;
+						screen_x = a->x +
+						    DisplayWidth(dpy, s->screen)
+						    - g->w - g->border_width;
 					else
-						screen_x = a->x + c->border;
+						screen_x = a->x + g->border_width;
 				}
 				if (!(a->geometry_mask & YValue)) {
 					screen_y = client_to_Xcoord(c, y);
@@ -162,9 +164,9 @@ make_new_client(Window w, struct screen_info * s)
 							a->y +
 							DisplayHeight(dpy,
 							s->screen) -
-							c->height - c->border;
+							g->h - g->border_width;
 					else
-						screen_y = a->y + c->border;
+					    screen_y = a->y + g->border_width;
 				}
 				client_update_screenpos(c, screen_x, screen_y);
 				moveresizeraise(c);
@@ -190,8 +192,8 @@ make_new_client(Window w, struct screen_info * s)
 		client_raise(c);
 		select_client(c);
 #ifdef WARP_POINTER
-		setmouse(c->window, c->width + c->border - 1,
-			c->height + c->border - 1);
+		setmouse(c->window, g->w + g->border_width - 1,
+			g->h + g->border_width - 1);
 #endif
 		discard_enter_events(c);
 	} else {
@@ -206,20 +208,24 @@ make_new_client(Window w, struct screen_info * s)
 static void
 init_geometry(struct client * c)
 {
-	int         need_send_config = 0;
-	long        size_flags;
-	XWindowAttributes attr;
-	unsigned long *eprop;
-	unsigned long nitems;
-	PropMwmHints *mprop;
-	unsigned long *lprop;
+	int			 need_send_config = 0;
+	long			 size_flags;
+	XWindowAttributes	 attr;
+	struct geometry		*g, *gp;
+	unsigned long		*eprop;
+	unsigned long		 nitems;
+	PropMwmHints		*mprop;
+	unsigned long		*lprop;
+
+	g = &c->current;
+	gp = &c->prev;
 
 	if ((mprop = get_property(c->window, mwm_hints, mwm_hints, &nitems))) {
 		if (nitems >= PROP_MWM_HINTS_ELEMENTS
 			&& (mprop->flags & MWM_HINTS_DECORATIONS)
 			&& !(mprop->decorations & MWM_DECOR_ALL)
 			&& !(mprop->decorations & MWM_DECOR_BORDER)) {
-			c->border = 0;
+			g->border_width = 0;
 		}
 		XFree(mprop);
 	}
@@ -233,36 +239,37 @@ init_geometry(struct client * c)
 		map_state_string(attr.map_state), attr.width, attr.height,
 		attr.x, attr.y, attr.border_width);
 	LOG_XLEAVE();
-	c->old_border = attr.border_width;
-	c->oldw = c->oldh = 0;
+	gp->border_width = attr.border_width;
+	gp->w = gp->h = 0;
 	c->cmap = attr.colormap;
 
 	if ((eprop = get_property(c->window, xa_evilwm_unmaximised_horz,
 				XA_CARDINAL, &nitems))) {
 		if (nitems == 2) {
-			c->oldx = eprop[0];
-			c->oldw = eprop[1];
+			gp->x = eprop[0];
+			gp->w = eprop[1];
 		}
 		XFree(eprop);
 	}
 	if ((eprop = get_property(c->window, xa_evilwm_unmaximised_vert,
 				XA_CARDINAL, &nitems))) {
 		if (nitems == 2) {
-			c->oldy = eprop[0];
-			c->oldh = eprop[1];
+			gp->y = eprop[0];
+			gp->h = eprop[1];
 		}
 		XFree(eprop);
 	}
 
 	size_flags = get_wm_normal_hints(c);
 
-	if ((attr.width >= c->min_width) && (attr.height >= c->min_height)) {
+	if ((attr.width >= c->hints.min_width) &&
+	    (attr.height >= c->hints.min_height)) {
 		/* if (attr.map_state == IsViewable || (size_flags & (PSize | USSize))) { */
-		c->width = attr.width;
-		c->height = attr.height;
+		g->w = attr.width;
+		g->h = attr.height;
 	} else {
-		c->width = c->min_width;
-		c->height = c->min_height;
+		g->w = c->hints.min_width;
+		g->h = c->hints.min_height;
 		need_send_config = 1;
 	}
 	client_calc_cog(c);
@@ -280,23 +287,23 @@ init_geometry(struct client * c)
 		c->phy = find_physical_screen(c->screen, x, y);
 		x -= c->phy->xoff;
 		y -= c->phy->yoff;
-		c->nx = (x * (c->phy->width - c->border -
-				c->width)) / c->phy->width;
-		c->ny = (y * (c->phy->height - c->border -
-				c->height)) / c->phy->height;
+		g->x = (x * (c->phy->width - g->border_width - g->w)) /
+		    c->phy->width;
+		g->y = (y * (c->phy->height - g->border_width - g->h)) /
+		    c->phy->height;
 		need_send_config = 1;
 	}
 
-	LOG_DEBUG("window started as %dx%d +%d+%d\n", c->width, c->height,
+	LOG_DEBUG("window started as %dx%d +%d+%d\n", g->w, g->h,
 		client_to_Xcoord(c, x), client_to_Xcoord(c, y));
 	if (attr.map_state == IsViewable) {
 		/* The reparent that is to come would trigger an unmap event */
 		c->ignore_unmap++;
 	}
-	c->nx += c->old_border;
-	c->ny += c->old_border;
-	gravitate_border(c, -c->old_border);
-	gravitate_border(c, c->border);
+	g->x += gp->border_width;
+	g->y += gp->border_width;
+	gravitate_border(c, -gp->border_width);
+	gravitate_border(c, g->border_width);
 
 	c->vdesk = c->phy->vdesk;
 	if ((lprop = get_property(c->window, xa_net_wm_desktop, XA_CARDINAL,
@@ -322,11 +329,11 @@ init_geometry(struct client * c)
 	}
 
 	/* ensure that the client isn't created off screen */
-	int         old_nx = c->nx;
-	int         old_ny = c->ny;
+	int         old_nx = g->x;
+	int         old_ny = g->y;
 
 	position_policy(c);
-	if (old_nx != c->nx || old_ny != c->ny)
+	if (old_nx != g->x || old_ny != g->y)
 		need_send_config = 1;
 
 	if (need_send_config)
@@ -336,14 +343,15 @@ init_geometry(struct client * c)
 static void
 reparent(struct client * c)
 {
-	XSetWindowAttributes p_attr;
+	struct geometry		 g = c->current;
+	XSetWindowAttributes	 p_attr;
 
 	p_attr.border_pixel = c->screen->bg.pixel;
 	p_attr.override_redirect = True;
 	p_attr.event_mask = ChildMask | ButtonPressMask | EnterWindowMask;
 	c->parent = XCreateWindow(dpy, c->screen->root,
-		client_to_Xcoord(c, x) - c->border, client_to_Xcoord(c,
-			y) - c->border, c->width, c->height, c->border,
+		client_to_Xcoord(c, x) - g.border_width, client_to_Xcoord(c,
+			y) - g.border_width, g.w, g.h, g.border_width,
 		DefaultDepth(dpy, c->screen->screen), CopyFromParent,
 		DefaultVisual(dpy, c->screen->screen),
 		CWOverrideRedirect | CWBorderPixel | CWEventMask, &p_attr);
@@ -372,39 +380,39 @@ get_wm_normal_hints(struct client * c)
 	LOG_XLEAVE();
 	flags = size->flags;
 	if (flags & PMinSize) {
-		c->min_width = size->min_width;
-		c->min_height = size->min_height;
+		c->hints.min_width = size->min_width;
+		c->hints.min_height = size->min_height;
 	} else {
-		c->min_width = c->min_height = 0;
+		c->hints.min_width = c->hints.min_height = 0;
 	}
 	if (flags & PMaxSize) {
-		c->max_width = size->max_width;
-		c->max_height = size->max_height;
+		c->hints.max_width = size->max_width;
+		c->hints.max_height = size->max_height;
 	} else {
-		c->max_width = c->max_height = 0;
+		c->hints.max_width = c->hints.max_height = 0;
 	}
 	if (flags & PBaseSize) {
-		c->base_width = size->base_width;
-		c->base_height = size->base_height;
+		c->hints.base_width = size->base_width;
+		c->hints.base_height = size->base_height;
 	} else {
-		c->base_width = c->min_width;
-		c->base_height = c->min_height;
+		c->hints.base_width = c->hints.min_width;
+		c->hints.base_height = c->hints.min_height;
 	}
-	c->width_inc = c->height_inc = 1;
+	c->hints.width_inc = c->hints.height_inc = 1;
 	if (flags & PResizeInc) {
-		c->width_inc = size->width_inc ? size->width_inc : 1;
-		c->height_inc = size->height_inc ? size->height_inc : 1;
+		c->hints.width_inc = size->width_inc ? size->width_inc : 1;
+		c->hints.height_inc = size->height_inc ? size->height_inc : 1;
 	}
 	if (!(flags & PMinSize)) {
-		c->min_width = c->base_width + c->width_inc;
-		c->min_height = c->base_height + c->height_inc;
+		c->hints.min_width = c->hints.base_width + c->hints.width_inc;
+		c->hints.min_height = c->hints.base_height + c->hints.height_inc;
 	}
 	if (flags & PWinGravity) {
-		c->win_gravity_hint = size->win_gravity;
+		c->hints.win_gravity_hint = size->win_gravity;
 	} else {
-		c->win_gravity_hint = NorthWestGravity;
+		c->hints.win_gravity_hint = NorthWestGravity;
 	}
-	c->win_gravity = c->win_gravity_hint;
+	c->hints.win_gravity = c->hints.win_gravity_hint;
 	XFree(size);
 	return flags;
 }

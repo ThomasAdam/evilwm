@@ -28,12 +28,14 @@ debug_atom_name(Atom a)
 static void
 handle_key_event(XKeyEvent * e)
 {
-	KeySym      key = XKeycodeToKeysym(dpy, e->keycode, 0);
-	struct client     *c;
-	int         width_inc, height_inc;
-	bool        move_client;
-	struct screen_info *current_screen;
-	struct physical_screen *current_phy;
+	struct client		*c;
+	struct geometry		*g;
+	struct geometry		*gp;
+	KeySym			 key = XKeycodeToKeysym(dpy, e->keycode, 0);
+	int			 width_inc, height_inc;
+	bool			 move_client;
+	struct screen_info	*current_screen;
+	struct physical_screen	*current_phy;
 
 	find_current_screen_and_phy(&current_screen, &current_phy);
 
@@ -113,68 +115,70 @@ handle_key_event(XKeyEvent * e)
 	c = current;
 	if (c == NULL)
 		return;
-	width_inc = (c->width_inc > 1) ? c->width_inc : 16;
-	height_inc = (c->height_inc > 1) ? c->height_inc : 16;
+
+	g = &c->current;
+	gp = &c->prev;
+
+	width_inc = (c->hints.width_inc > 1) ? c->hints.width_inc : 16;
+	height_inc = (c->hints.height_inc > 1) ? c->hints.height_inc : 16;
 	move_client = false;
 	switch (key) {
 		case KEY_LEFT:
 			if (e->state & altmask) {
-				if ((c->width - width_inc) >= c->min_width)
-					c->width -= width_inc;
+				if ((g->w - width_inc) >= c->hints.min_width)
+					g->w -= width_inc;
 			} else {
-				c->nx -= 16;
+				g->x -= 16;
 			}
 			move_client = true;
 			break;
 		case KEY_DOWN:
 			if (e->state & altmask) {
-				if (!c->max_height
-					|| (c->height + height_inc) <=
-					c->max_height)
-					c->height += height_inc;
+				if (!c->hints.max_height ||
+				    (g->h + height_inc) <= c->hints.max_height)
+					g->h += height_inc;
 			} else {
-				c->ny += 16;
+				g->y += 16;
 			}
 			move_client = true;
 			break;
 		case KEY_UP:
 			if (e->state & altmask) {
-				if ((c->height - height_inc) >= c->min_height)
-					c->height -= height_inc;
+				if ((g->h - height_inc) >= c->hints.min_height)
+					g->h -= height_inc;
 			} else {
-				c->ny -= 16;
+				g->y -= 16;
 			}
 			move_client = true;
 			break;
 		case KEY_RIGHT:
 			if (e->state & altmask) {
-				if (!c->max_width
-					|| (c->width + width_inc) <=
-					c->max_width)
-					c->width += width_inc;
+				if (!c->hints.max_width ||
+				    (g->w + width_inc) <= c->hints.max_width)
+					g->w += width_inc;
 			} else {
-				c->nx += 16;
+				g->x += 16;
 			}
 			move_client = true;
 			break;
 		case KEY_TOPLEFT:
-			c->nx = c->border;
-			c->ny = c->border;
+			g->x = g->border_width;
+			g->y = g->border_width;
 			move_client = true;
 			break;
 		case KEY_TOPRIGHT:
-			c->nx = c->phy->width - c->width - c->border;
-			c->ny = c->border;
+			g->x = c->phy->width - g->w - g->border_width;
+			g->y = g->border_width;
 			move_client = true;
 			break;
 		case KEY_BOTTOMLEFT:
-			c->nx = c->border;
-			c->ny = c->phy->height - c->height - c->border;
+			g->x = g->border_width;
+			g->y = c->phy->height - g->h - g->border_width;
 			move_client = true;
 			break;
 		case KEY_BOTTOMRIGHT:
-			c->nx = c->phy->width - c->width - c->border;
-			c->ny = c->phy->height - c->height - c->border;
+			g->x = c->phy->width - g->w - g->border_width;
+			g->y = c->phy->height - g->h - g->border_width;
 			move_client = true;
 			break;
 		case KEY_LOWER:
@@ -215,16 +219,16 @@ handle_key_event(XKeyEvent * e)
 		send_wm_delete(c, e->state & altmask);
 	if (move_client != true)
 		return;
-	if (abs(c->nx) == c->border && c->oldw != 0)
-		c->nx = 0;
-	if (abs(c->ny) == c->border && c->oldh != 0)
-		c->ny = 0;
+	if (abs(g->x) == g->border_width && gp->w != 0)
+		g->x = 0;
+	if (abs(g->y) == g->border_width && gp->h != 0)
+		g->y = 0;
 	client_calc_cog(c);
 	client_calc_phy(c);
 	moveresizeraise(c);
 #ifdef WARP_POINTER
-	setmouse(c->window, c->width + c->border - 1,
-		c->height + c->border - 1);
+	setmouse(c->window, g->w + g->border_width - 1,
+		g->h + g->border_width - 1);
 #endif
 	discard_enter_events(c);
 	return;
@@ -255,9 +259,11 @@ handle_button_event(XButtonEvent * e)
 static void
 do_window_changes(int value_mask, XWindowChanges * wc, struct client * c, int gravity)
 {
+	struct geometry	*g = &c->current;
+
 	if (gravity == 0)
-		gravity = c->win_gravity_hint;
-	c->win_gravity = gravity;
+		gravity = c->hints.win_gravity_hint;
+	c->hints.win_gravity = gravity;
 
 	/* Warning: these co-ordinates are in screen co-ordinates */
 	int         screen_x = client_to_Xcoord(c, x);
@@ -273,27 +279,27 @@ do_window_changes(int value_mask, XWindowChanges * wc, struct client * c, int gr
 		int         dw = 0, dh = 0;
 
 		if (!(value_mask & (CWX | CWY))) {
-			gravitate_border(c, -c->border);
+			gravitate_border(c, -g->border_width);
 		}
 		if (value_mask & CWWidth) {
 			int         neww = wc->width;
 
-			if (neww < c->min_width)
-				neww = c->min_width;
-			if (c->max_width && neww > c->max_width)
-				neww = c->max_width;
-			dw = neww - c->width;
-			c->width = neww;
+			if (neww < c->hints.min_width)
+				neww = c->hints.min_width;
+			if (c->hints.max_width && neww > c->hints.max_width)
+				neww = c->hints.max_width;
+			dw = neww - g->w;
+			g->w = neww;
 		}
 		if (value_mask & CWHeight) {
 			int         newh = wc->height;
 
-			if (newh < c->min_height)
-				newh = c->min_height;
-			if (c->max_height && newh > c->max_height)
-				newh = c->max_height;
-			dh = newh - c->height;
-			c->height = newh;
+			if (newh < c->hints.min_height)
+				newh = c->hints.min_height;
+			if (c->hints.max_height && newh > c->hints.max_height)
+				newh = c->hints.max_height;
+			dh = newh - g->h;
+			g->h = newh;
 		}
 		/* only apply position fixes if not being explicitly moved */
 		if (!(value_mask & (CWX | CWY))) {
@@ -302,47 +308,47 @@ do_window_changes(int value_mask, XWindowChanges * wc, struct client * c, int gr
 				case NorthWestGravity:
 					break;
 				case NorthGravity:
-					c->nx -= (dw / 2);
+					g->x -= (dw / 2);
 					break;
 				case NorthEastGravity:
-					c->nx -= dw;
+					g->x -= dw;
 					break;
 				case WestGravity:
-					c->ny -= (dh / 2);
+					g->y -= (dh / 2);
 					break;
 				case CenterGravity:
-					c->nx -= (dw / 2);
-					c->ny -= (dh / 2);
+					g->x -= (dw / 2);
+					g->y -= (dh / 2);
 					break;
 				case EastGravity:
-					c->nx -= dw;
-					c->ny -= (dh / 2);
+					g->x -= dw;
+					g->y -= (dh / 2);
 					break;
 				case SouthWestGravity:
-					c->ny -= dh;
+					g->y -= dh;
 					break;
 				case SouthGravity:
-					c->nx -= (dw / 2);
-					c->ny -= dh;
+					g->x -= (dw / 2);
+					g->y -= dh;
 					break;
 				case SouthEastGravity:
-					c->nx -= dw;
-					c->ny -= dh;
+					g->x -= dw;
+					g->y -= dh;
 					break;
 			}
 			value_mask |= CWX | CWY;
-			gravitate_border(c, c->border);
+			gravitate_border(c, g->border_width);
 		}
 		/* Recalculate the centre of gravity if resized */
 		/* This may change the display to which the client belongs */
 		client_calc_cog(c);
 		client_calc_phy(c);
 	}
-	wc->x = client_to_Xcoord(c, x) - c->border;
-	wc->y = client_to_Xcoord(c, y) - c->border;
-	wc->border_width = c->border;
+	wc->x = client_to_Xcoord(c, x) - g->border_width;
+	wc->y = client_to_Xcoord(c, y) - g->border_width;
+	wc->border_width = g->border_width;
 	XConfigureWindow(dpy, c->parent, value_mask, wc);
-	XMoveResizeWindow(dpy, c->window, 0, 0, c->width, c->height);
+	XMoveResizeWindow(dpy, c->window, 0, 0, g->w, g->h);
 	if ((value_mask & (CWX | CWY)) && !(value_mask & (CWWidth | CWHeight))) {
 		send_config(c);
 	}
@@ -612,7 +618,7 @@ handle_client_message(XClientMessageEvent * e)
 			wc.sibling = e->data.l[1];
 			wc.stack_mode = e->data.l[2];
 			do_window_changes(CWSibling | CWStackMode, &wc, c,
-				c->win_gravity);
+				c->hints.win_gravity);
 		}
 		LOG_LEAVE();
 		return;

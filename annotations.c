@@ -32,7 +32,12 @@ static PangoLayout *info_pl = NULL;
 static void
 infobanner_create(struct client * c)
 {
+	struct geometry	 g;
+
 	assert(info_window == None);
+
+	g = c->current;
+
 	info_window = XCreateWindow(dpy, c->screen->root, -4, -4, 2, 2, 0,
 		CopyFromParent, InputOutput, CopyFromParent,
 		CWSaveUnder | CWBackPixel, &(XSetWindowAttributes) {
@@ -61,7 +66,7 @@ infobanner_create(struct client * c)
 	PangoFontDescription *pd =
 		pango_font_description_from_string("Sans 12");
 	pango_layout_set_font_description(info_pl, pd);
-	pango_layout_set_width(info_pl, c->width * PANGO_SCALE);
+	pango_layout_set_width(info_pl, g.w * PANGO_SCALE);
 	pango_font_description_free(pd);
 #endif
 
@@ -93,21 +98,27 @@ fetch_utf8_name(Display * d, Window w, char **name)
 static void
 infobanner_update(struct client * c)
 {
-	char       *name;
-	char        buf[27];
-	int         iwinx, iwiny, iwinw, iwinh;
-	int         width_inc = c->width_inc, height_inc = c->height_inc;
+	struct geometry	 g;
+	char		*name;
+	char		 buf[27];
+	int		 iwinx, iwiny, iwinw, iwinh;
+	int		 width_inc = c->hints.width_inc;
+	int		 height_inc = c->hints.height_inc;
 
 	if (!info_window)
 		return;
+
+	g = c->current;
+
 	snprintf(buf, sizeof(buf), "%dx%d+%d+%d",
-		(c->width - c->base_width) / width_inc,
-		(c->height - c->base_height) / height_inc, client_to_Xcoord(c,
-			x), client_to_Xcoord(c, y));
+		(g.w - c->hints.base_width) / width_inc,
+		(g.h - c->hints.base_height) / height_inc,
+		client_to_Xcoord(c,x), client_to_Xcoord(c, y));
 	iwinw = XTextWidth(font, buf, strlen(buf)) + 2;
 	iwinh = font->max_bounds.ascent + font->max_bounds.descent;
 
 	fetch_utf8_name(dpy, c->window, &name);
+
 	if (name) {
 #ifdef PANGO
 		int         namew, nameh;
@@ -125,8 +136,8 @@ infobanner_update(struct client * c)
 		iwinh += nameh;
 	}
 
-	iwinx = c->nx + c->border + c->width - iwinw;
-	iwiny = c->ny - c->border;
+	iwinx = g.x + g.border_width + g.w - iwinw;
+	iwiny = g.y - g.border_width;
 	if (iwinx + iwinw > c->phy->width)
 		iwinx = c->phy->width - iwinw;
 	if (iwinx < 0)
@@ -173,30 +184,34 @@ infobanner_remove(struct client * c)
 static void
 xor_draw_outline(struct client * c)
 {
-	int         screen_x = client_to_Xcoord(c, x);
-	int         screen_y = client_to_Xcoord(c, y);
+	struct geometry	 g;
+	int		 screen_x = client_to_Xcoord(c, x);
+	int		 screen_y = client_to_Xcoord(c, y);
+
+	g = c->current;
 
 	XDrawRectangle(dpy, c->screen->root, c->screen->invert_gc,
-		screen_x - c->border, screen_y - c->border,
-		c->width + 2 * c->border - 1, c->height + 2 * c->border - 1);
+		screen_x - g.border_width, screen_y - g.border_width,
+		g.w + 2 * g.border_width - 1, g.h + 2 * g.border_width - 1);
 }
 
 static void
 xor_draw_info(struct client * c)
 {
-	int         screen_x = client_to_Xcoord(c, x);
-	int         screen_y = client_to_Xcoord(c, y);
+	struct geometry	 g;
+	int		 screen_x = client_to_Xcoord(c, x);
+	int		 screen_y = client_to_Xcoord(c, y);
+	char		 buf[27];
 
-	char        buf[27];
+	g = c->current;
 
 	snprintf(buf, sizeof(buf), "%dx%d+%d+%d",
-		(c->width - c->base_width) / c->width_inc,
-		(c->height - c->base_height) / c->height_inc, screen_x,
-		screen_y);
+		(g.w - c->hints.base_width) / c->hints.width_inc,
+		(g.h - c->hints.base_height) / c->hints.height_inc,
+		screen_x, screen_y);
 	XDrawString(dpy, c->screen->root, c->screen->invert_gc,
-		screen_x + c->width - XTextWidth(font, buf,
-			strlen(buf)) - SPACE, screen_y + c->height - SPACE,
-		buf, strlen(buf));
+		screen_x + g.w - XTextWidth(font, buf, strlen(buf)) -
+		SPACE, screen_y + g.h - SPACE, buf, strlen(buf));
 }
 
 static void
@@ -283,13 +298,20 @@ shape_outline_shape(struct client * c)
 static void
 shape_outline_create(struct client * c)
 {
+	struct geometry	 g;
+	int		 screen_x;
+	int		 screen_y;
+	unsigned	 width;
+	unsigned	 height;
+
 	if (shape_outline_window != None)
 		return;
 
-	int         screen_x = client_to_Xcoord(c, x) - c->border;
-	int         screen_y = client_to_Xcoord(c, y) - c->border;
-	unsigned    width = c->width + 2 * c->border;
-	unsigned    height = c->height + 2 * c->border;
+	g = c->current;
+	width = g.w + 2 * g.border_width;
+	height = g.h + 2 * g.border_width;
+	screen_x = client_to_Xcoord(c, x) - g.border_width;
+	screen_y = client_to_Xcoord(c, y) - g.border_width;
 
 	/* cache width & height */
 	shape_outline_width = width;
@@ -298,9 +320,11 @@ shape_outline_create(struct client * c)
 	shape_outline_window =
 		XCreateWindow(dpy, c->screen->root, screen_x, screen_y, width,
 		height, 0, CopyFromParent, InputOutput, CopyFromParent,
-		CWSaveUnder | CWBackPixel, &(XSetWindowAttributes) {
-		.background_pixel = c->screen->fg.pixel,.save_under =
-			True});
+		CWSaveUnder | CWBackPixel,
+		&(XSetWindowAttributes) {
+			.background_pixel = c->screen->fg.pixel,
+			.save_under =True
+		});
 
 	shape_outline_shape(c);
 	XMapRaised(dpy, shape_outline_window);
@@ -318,10 +342,18 @@ shape_outline_remove(struct client * c)
 static void
 shape_outline_update(struct client * c)
 {
-	int         screen_x = client_to_Xcoord(c, x) - c->border;
-	int         screen_y = client_to_Xcoord(c, y) - c->border;
-	unsigned    width = c->width + 2 * c->border;
-	unsigned    height = c->height + 2 * c->border;
+	struct geometry	 g;
+	int		 screen_x;
+	int		 screen_y;
+	unsigned	 width;
+	unsigned	 height;
+
+	g = c->current;
+
+	width = g.w + 2 * g.border_width;
+	height = g.h + 2 * g.border_width;
+	screen_x = client_to_Xcoord(c, x) - g.border_width;
+	screen_y = client_to_Xcoord(c, y) - g.border_width;
 
 	XMoveResizeWindow(dpy, shape_outline_window, screen_x, screen_y, width,
 		height);

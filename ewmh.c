@@ -271,8 +271,8 @@ ewmh_init_client(struct client * c)
 	int         nelements = sizeof(allowed_actions) / sizeof(Atom);
 
 	/* Omit resize element if resizing not possible: */
-	if (c->max_width && c->max_width == c->min_width
-		&& c->max_height && c->max_height == c->min_height)
+	if (c->hints.max_width && c->hints.max_width == c->hints.min_width
+	    && c->hints.max_height && c->hints.max_height == c->hints.min_height)
 		nelements--;
 	XChangeProperty(dpy, c->window, xa_net_wm_allowed_actions,
 		XA_ATOM, 32, PropModeReplace,
@@ -401,14 +401,15 @@ ewmh_get_net_wm_window_type(Window w)
 void
 ewmh_set_net_wm_state(struct client * c)
 {
-	Atom        state[3];
-	int         i = 0;
+	struct geometry	 gp = c->prev;
+	Atom		 state[3];
+	int		 i = 0;
 
-	if (c->oldh)
+	if (gp.h)
 		state[i++] = xa_net_wm_state_maximized_vert;
-	if (c->oldw)
+	if (gp.w)
 		state[i++] = xa_net_wm_state_maximized_horz;
-	if (c->oldh && c->oldw)
+	if (gp.h && gp.w)
 		state[i++] = xa_net_wm_state_fullscreen;
 	XChangeProperty(dpy, c->window, xa_net_wm_state,
 		XA_ATOM, 32, PropModeReplace, (unsigned char *) &state, i);

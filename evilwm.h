@@ -150,32 +150,45 @@ struct screen_info
 	struct physical_screen *physical;	/* Physical screens that make up this screen */
 };
 
+/* Geometry to hold x/y position and w/h of window.
+ *
+ * Also contains the border_width of the client.
+ */
+struct geometry {
+	int  x;
+	int  y;
+	int  h;
+	int  w;
+	int  border_width;
+};
+
 /* client structure */
 struct client
 {
-	Window      window;
-	Window      parent;
-	struct screen_info *screen;
-	struct physical_screen *phy;	/* the physical screen the client is on. */
-	Colormap    cmap;
-	int         ignore_unmap;
+	Window                   window;
+	Window                   parent;
+	struct screen_info      *screen;
+	struct physical_screen  *phy;	/* the physical screen the client is on. */
+	Colormap                 cmap;
+	int                      ignore_unmap;
 
-	int         nx, ny, width, height;
-	int         border;
-	int         oldx, oldy, oldw, oldh;	/* used when maximising */
+	struct geometry          current;
+	struct geometry          prev;
 
-	XPoint      cog;	/* client's centre of gravity */
+	XPoint                   cog;	/* client's centre of gravity */
 
-	int         min_width, min_height;
-	int         max_width, max_height;
-	int         width_inc, height_inc;
-	int         base_width, base_height;
-	int         win_gravity_hint;
-	int         win_gravity;
-	int         old_border;
-	unsigned int vdesk;
-	int         is_dock;
-	int         remove;	/* set when client needs to be removed */
+	struct {
+		int      min_width, min_height;
+		int      max_width, max_height;
+		int      width_inc, height_inc;
+		int      base_width, base_height;
+		int      win_gravity_hint;
+		int      win_gravity;
+	} hints;
+
+	unsigned int             vdesk;
+	int                      is_dock;
+	int                      remove;	/* set when client needs to be removed */
 };
 
 struct application
@@ -275,8 +288,8 @@ extern volatile Window initialising;
 extern int  wm_exit;
 
 /* client.c */
-#define client_to_Xcoord(c,T) (c->phy-> T ## off + c-> n ## T)
-#define client_from_Xcoord(c,T,value) do { c-> n ## T = value - c->phy-> T ## off; } while (0)
+#define client_to_Xcoord(c,T) (c->phy-> T ## off + c->current.T)
+#define client_from_Xcoord(c,T,value) do { c->current.T = value - c->phy-> T ## off; } while (0)
 struct client     *find_client(Window w);
 void        client_hide(struct client * c);
 void        client_show(struct client * c);

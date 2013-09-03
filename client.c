@@ -87,8 +87,12 @@ client_lower(struct client * c)
 void
 client_calc_cog(struct client * c)
 {
-	c->cog.x = c->width / 2;
-	c->cog.y = c->height / 2;
+	struct geometry	 g;
+
+	g = c->current;
+
+	c->cog.x = g.w / 2;
+	c->cog.y = g.h / 2;
 	/* xxx: handle shaped windows oneday */
 }
 
@@ -115,10 +119,12 @@ client_calc_phy(struct client * c)
 void
 client_update_screenpos(struct client * c, int screen_x, int screen_y)
 {
+	struct geometry	*g = &c->current;
+
 	c->phy = find_physical_screen(c->screen, screen_x + c->cog.x,
 		screen_y + c->cog.y);
-	c->nx = screen_x - c->phy->xoff;
-	c->ny = screen_y - c->phy->yoff;
+	g->x = screen_x - c->phy->xoff;
+	g->y = screen_y - c->phy->yoff;
 }
 
 void
@@ -140,15 +146,18 @@ set_wm_state(struct client * c, int state)
 void
 send_config(struct client * c)
 {
-	XConfigureEvent ce;
+	XConfigureEvent	 ce;
+	struct geometry	 g;
+
+	g = c->current;
 
 	ce.type = ConfigureNotify;
 	ce.event = c->window;
 	ce.window = c->window;
 	ce.x = client_to_Xcoord(c, x);
 	ce.y = client_to_Xcoord(c, y);
-	ce.width = c->width;
-	ce.height = c->height;
+	ce.width = g.w;
+	ce.height = g.h;
 	ce.border_width = 0;
 	ce.above = None;
 	ce.override_redirect = False;
@@ -161,9 +170,10 @@ send_config(struct client * c)
 void
 gravitate_border(struct client * c, int bw)
 {
-	int         dx = 0, dy = 0;
+	struct geometry		*g = &c->current;
+	int			 dx = 0, dy = 0;
 
-	switch (c->win_gravity) {
+	switch (c->hints.win_gravity) {
 		default:
 		case NorthWestGravity:
 			dx = bw;
@@ -196,11 +206,11 @@ gravitate_border(struct client * c, int bw)
 			dy = -bw;
 			break;
 	}
-	if (c->nx != 0 || c->width != c->phy->width) {
-		c->nx += dx;
+	if (g->x != 0 || g->w != c->phy->width) {
+		g->x += dx;
 	}
-	if (c->ny != 0 || c->height != c->phy->height) {
-		c->ny += dy;
+	if (g->y != 0 || g->h != c->phy->height) {
+		g->y += dy;
 	}
 	/* XXX: do we need to recalculate phy? */
 }
@@ -248,6 +258,9 @@ client_to_vdesk(struct client * c, unsigned int vdesk)
 void
 remove_client(struct client * c)
 {
+	struct geometry	*g = &c->current;
+	struct geometry	*gp = &c->prev;
+
 	LOG_ENTER("remove_client(window=%lx, %s)", c->window,
 		c->remove ? "withdrawing" : "wm quitting");
 
@@ -271,13 +284,13 @@ remove_client(struct client * c)
 		ewmh_deinit_client(c);
 	}
 
-	gravitate_border(c, -c->border);
-	gravitate_border(c, c->old_border);
-	c->nx -= c->old_border;
-	c->ny -= c->old_border;
+	gravitate_border(c, -g->border_width);
+	gravitate_border(c, gp->border_width);
+	g->x -= gp->border_width;
+	g->y -= gp->border_width;
 	XReparentWindow(dpy, c->window, c->screen->root,
 		client_to_Xcoord(c, x), client_to_Xcoord(c, y));
-	XSetWindowBorderWidth(dpy, c->window, c->old_border);
+	XSetWindowBorderWidth(dpy, c->window, gp->border_width);
 	XRemoveFromSaveSet(dpy, c->window);
 	if (c->parent)
 		XDestroyWindow(dpy, c->parent);
